@@ -184,8 +184,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 ></div>
 
                 {/* 2. SHIELD KANAN ATAS (Desktop Share/WatchLater) */}
+                {/* MODIFIED: Ditambahkan class 'shield-desktop-only' agar bisa di-handle CSS media query */}
                 <div 
-                  className="hidden md:block absolute top-0 right-0 w-[20%] h-[80px] bg-transparent pointer-events-auto cursor-default"
+                  className="hidden md:block absolute top-0 right-0 w-[20%] h-[80px] bg-transparent pointer-events-auto cursor-default shield-desktop-only"
                   onContextMenu={stopEvent} onClick={stopEvent}
                 ></div>
 
@@ -264,6 +265,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         .video-js { width: 100%; height: 100%; }
         .vjs-tech { object-fit: contain; }
         .vjs-big-play-button { display: none !important; }
+
+        /* --- GENIUS FIX FOR MOBILE LANDSCAPE --- */
+        /* Logic: Jika device adalah layar sentuh (coarse pointer), 
+           Maka shield kanan atas DIHILANGKAN, walaupun width layarnya masuk kategori desktop (md).
+           Ini membuat Gear Icon di Mobile Landscape bisa dipencet, 
+           tapi tombol Share di Desktop Mouse tetap terblokir. */
+        @media (pointer: coarse) {
+            .shield-desktop-only {
+                display: none !important;
+            }
+        }
       `}</style>
     </div>
   );
