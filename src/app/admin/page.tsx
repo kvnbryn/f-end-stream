@@ -161,40 +161,39 @@ export default function AdminPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // --- FETCH USERS (SERVER SIDE + CACHE BUSTER) ---
+  // --- FETCH USERS (SERVER SIDE + CACHE BUSTER + SAFETY SLICE) ---
   const fetchUsers = useCallback(async () => {
     if (!token) return;
     setIsLoadingUsers(true);
     try {
+        // Param Query Sakti
         const params = new URLSearchParams({
             page: page.toString(),
             limit: '20',
             search: debouncedSearch,
             status: userFilter,
-            // ANTI-CACHE: Tambah parameter waktu biar URL selalu beda
-            _t: new Date().getTime().toString()
+            _t: new Date().getTime().toString() // ANTI-CACHE
         });
 
-        // FORCE NO CACHE DI SINI
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
              headers: { 'Authorization': `Bearer ${token}` },
-             cache: 'no-store', // Paksa browser/cloudflare ambil data baru
-             next: { revalidate: 0 } // Khusus Next.js
+             cache: 'no-store'
         });
         
         const data = await res.json();
         
         if (res.ok) {
-            // Cek Format Data
             if (Array.isArray(data)) {
-                 // Kalau masih masuk sini, berarti bener-bener parah cachenya atau file backend salah edit
-                 console.warn("Backend still returning Array!", data);
-                 setUsers(data);
+                 // --- SAFETY MODE (BACKEND LAMA) ---
+                 // Kita potong datanya cuma 50 biar browser lu gak meledak!
+                 console.error("CRITICAL: BACKEND VERSI LAMA TERDETEKSI. Mengaktifkan Safe Mode.");
+                 const safeData = data.slice(0, 50); // Cuma ambil 50
+                 setUsers(safeData);
                  setTotalPages(1);
                  setTotalUsers(data.length);
-                 // Kita sembunyikan warning dulu biar ga bikin emosi, tapi kita log di console
+                 showToast('Mode Lambat: Backend belum update! Hanya menampilkan 50 user.', 'error');
             } else if (data.data && data.meta) {
-                 // Format Baru (Sukses)
+                 // --- OPTIMIZED MODE (BACKEND BARU) ---
                  setUsers(data.data);
                  setTotalPages(data.meta.totalPages);
                  setTotalUsers(data.meta.total);
