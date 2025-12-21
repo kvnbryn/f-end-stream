@@ -129,20 +129,28 @@ export default function AdminPage() {
   const fetchAllData = async () => {
      if (!token) return;
      try {
-         const resUsers = await fetch(`${backendUrl}/api/v1/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
-         if(resUsers.ok) setUsers(await resUsers.json());
-         
-         const resSched = await fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } });
-         if(resSched.ok) setSchedules(await resSched.json());
+         // --- OPTIMIZATION START: PARALLEL FETCHING ---
+         // Menggunakan Promise.all agar semua request berjalan bersamaan, tidak antri satu-satu.
+         // Ini sangat membantu karena Frontend (Vercel) dan Backend (VPS) terpisah jarak.
+         const [resUsers, resSched, resPkg] = await Promise.all([
+             fetch(`${backendUrl}/api/v1/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
+             fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
+             fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } })
+         ]);
 
-         const resPkg = await fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } });
+         if(resUsers.ok) setUsers(await resUsers.json());
+         if(resSched.ok) setSchedules(await resSched.json());
          if(resPkg.ok) {
              const data = await resPkg.json();
              setPackages(data.packages);
              setQrisUrl(data.qrisUrl);
          }
+         // --- OPTIMIZATION END ---
 
-     } catch (e) { console.error(e); }
+     } catch (e) { 
+         console.error(e); 
+         showToast("Gagal memuat data. Periksa koneksi.", "error");
+     }
   };
 
   const fetchMedia = async () => {
