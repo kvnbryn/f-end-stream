@@ -17,11 +17,10 @@ type User = {
     id: string; 
     email: string; 
     role: string; 
-    status: string; 
+    status: string; // 'ACTIVE' | 'PENDING'
     last_order_info: string | null;
     registered_device_id: string | null; 
     Subscription: Subscription | null; 
-    created_at?: string;
 };
 
 type Quality = { label: string; url: string }; 
@@ -81,19 +80,16 @@ export default function AdminPage() {
   const { token, logout, isLoading } = useAuth();
   const router = useRouter();
   
-  // State Main
+  // State
   const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers'>('users');
-  
-  // State Data
-  const [users, setUsers] = useState<User[]>([]); // Note: Sekarang isinya cuma user yang sesuai filter!
+  const [users, setUsers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [qrisUrl, setQrisUrl] = useState('');
-
-  // USER FILTER STATE & SEARCH
-  const [userFilter, setUserFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'EXPIRED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState(''); // GENIUS: Untuk optimasi API call
+
+  // USER FILTER STATE (NEW)
+  const [userFilter, setUserFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'EXPIRED'>('ALL');
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
   // Modal & UI
@@ -103,7 +99,7 @@ export default function AdminPage() {
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false); // NEW MODAL
 
   const [mediaMode, setMediaMode] = useState<'schedule' | 'qris' | 'package'>('schedule');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -149,48 +145,16 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // --- GENIUS OPTIMIZATION: DEBOUNCE SEARCH ---
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 500); // Tunggu 500ms setelah user berhenti ngetik
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
-
-  // --- GENIUS OPTIMIZATION: DATA FETCHERS (NO-CACHE FORCED) ---
-  
-  const fetchUsers = async () => {
-    if (!token) return;
-    try {
-        const params = new URLSearchParams();
-        if (userFilter !== 'ALL') params.append('filter', userFilter);
-        if (debouncedSearch) params.append('search', debouncedSearch);
-
-        // NOTE: Kita paksa request baru setiap kali (no-cache) agar filter real-time
-        const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, { 
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Prisma': 'no-cache'
-            },
-            cache: 'no-store' 
-        });
-        
-        if (res.ok) {
-            setUsers(await res.json());
-            setSelectedUserIds(new Set()); 
-        }
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchOtherData = async () => {
+  const fetchAllData = async () => {
      if (!token) return;
      try {
-         const [resSched, resPkg] = await Promise.all([
+         const [resUsers, resSched, resPkg] = await Promise.all([
+             fetch(`${backendUrl}/api/v1/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
              fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
              fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } })
          ]);
 
+         if(resUsers.ok) setUsers(await resUsers.json());
          if(resSched.ok) setSchedules(await resSched.json());
          if(resPkg.ok) {
              const data = await resPkg.json();
@@ -200,24 +164,6 @@ export default function AdminPage() {
      } catch (e) { console.error(e); }
   };
 
-  // --- USE EFFECTS ---
-  
-  // 1. Initial Load & Auth Check
-  useEffect(() => { 
-      if (!isLoading && token) { 
-          fetchOtherData();
-          fetchUsers();
-      } 
-      if (!isLoading && !token) router.push('/login'); 
-  }, [isLoading, token]);
-
-  // 2. Trigger Fetch User ketika Filter/Search Berubah
-  useEffect(() => {
-      if (token && activeTab === 'users') {
-          fetchUsers();
-      }
-  }, [token, userFilter, debouncedSearch, activeTab]);
-
   const fetchMedia = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/v1/admin/media`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -225,12 +171,22 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
-  // --- HELPER VISUAL ---
+  // --- USER VALIDATION HELPERS ---
   const isUserExpired = (user: User) => {
       if (user.status === 'PENDING') return false;
       if (!user.Subscription) return true;
       return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
   };
+
+  const getFilteredUsers = () => {
+      let filtered = users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (userFilter === 'PENDING') return filtered.filter(u => u.status === 'PENDING');
+      if (userFilter === 'ACTIVE') return filtered.filter(u => u.status !== 'PENDING' && !isUserExpired(u));
+      if (userFilter === 'EXPIRED') return filtered.filter(u => u.status !== 'PENDING' && isUserExpired(u));
+      return filtered;
+  };
+
+  const currentFilteredUsers = getFilteredUsers();
 
   // --- BULK ACTIONS ---
   const handleSelectUser = (id: string) => {
@@ -241,8 +197,8 @@ export default function AdminPage() {
   };
 
   const handleSelectAll = () => {
-      if (selectedUserIds.size === users.length) setSelectedUserIds(new Set());
-      else setSelectedUserIds(new Set(users.map(u => u.id)));
+      if (selectedUserIds.size === currentFilteredUsers.length) setSelectedUserIds(new Set());
+      else setSelectedUserIds(new Set(currentFilteredUsers.map(u => u.id)));
   };
 
   const handleBulkDelete = async () => {
@@ -255,14 +211,14 @@ export default function AdminPage() {
           });
           showToast('Users Deleted', 'success');
           setSelectedUserIds(new Set());
-          fetchUsers(); // Refresh Users
+          fetchAllData();
       } catch (e) { showToast('Gagal hapus massal', 'error'); }
   };
 
   // --- APPROVE USER ---
   const handleApproveClick = (user: User) => {
       setEditingUser(user);
-      setUserFormDuration(30);
+      setUserFormDuration(30); // Default
       setShowApproveModal(true);
   };
 
@@ -276,7 +232,7 @@ export default function AdminPage() {
           });
           showToast('User Approved!', 'success');
           setShowApproveModal(false);
-          fetchUsers(); // Refresh Users
+          fetchAllData();
       } catch (e) { showToast('Gagal approve', 'error'); }
   };
 
@@ -307,29 +263,31 @@ export default function AdminPage() {
     }
   };
   
-  const handleCreateUser = async (e: React.FormEvent) => { e.preventDefault(); try { await fetch(`${backendUrl}/api/v1/admin/users`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) }) }); showToast('User dibuat!', 'success'); setUserFormEmail(''); setShowUserModal(false); fetchUsers(); } catch(e:any){ showToast(e.message,'error');} };
+  const handleCreateUser = async (e: React.FormEvent) => { e.preventDefault(); try { await fetch(`${backendUrl}/api/v1/admin/users`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) }) }); showToast('User dibuat!', 'success'); setUserFormEmail(''); setShowUserModal(false); fetchAllData(); } catch(e:any){ showToast(e.message,'error');} };
   
   const handleBulkImport = async (e: React.FormEvent) => {
       e.preventDefault(); setBulkLoading(true);
-      try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchUsers(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); }
+      try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchAllData(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); }
   };
 
   const handleEditUserClick = (user: User) => { setEditingUser(user); setUserFormEmail(user.email); setUserFormDuration(0); setShowEditUserModal(true); };
-  const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchUsers(); };
-  const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
-  const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
+  const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchAllData(); };
+  const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
+  const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
   
   const addQuality = () => { if(tempLabel && tempUrl) { setQualities([...qualities, { label: tempLabel, url: tempUrl }]); setTempLabel(''); setTempUrl(''); } };
   const removeQuality = (idx: number) => { setQualities(qualities.filter((_, i) => i !== idx)); };
 
-  const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchOtherData(); };
-  const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchOtherData(); };
-  const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchOtherData(); };
+  const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchAllData(); };
+  const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
+  const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
 
   const handleOpenPackageModal = (pkg?: Package) => { if (pkg) { setEditingPackage(pkg); setPkgTitle(pkg.title); setPkgPrice(pkg.price.toString()); setPkgDuration(pkg.duration.toString()); setPkgFeatures(pkg.description || ''); setPkgTopic(pkg.topic || ''); setPkgIsLimited(pkg.is_limited || false); setPkgStock(pkg.stock?.toString() || ''); setPkgImage(pkg.image_url || ''); } else { setEditingPackage(null); setPkgTitle(''); setPkgPrice(''); setPkgDuration(''); setPkgFeatures(''); setPkgTopic(''); setPkgIsLimited(false); setPkgStock(''); setPkgImage(''); } setShowPackageModal(true); };
-  const handleSavePackage = async (e: React.FormEvent) => { e.preventDefault(); try { const payload = { title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock, image_url: pkgImage }; if (editingPackage) { await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Updated', 'success'); } else { await fetch(`${backendUrl}/api/v1/admin/packages`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Created', 'success'); } setShowPackageModal(false); fetchOtherData(); } catch(e) { showToast('Error saving package', 'error'); } };
-  const handleTogglePackageStatus = async (pkg: Package) => { try { await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !pkg.is_active }) }); showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success'); fetchOtherData(); } catch(e) { showToast('Error update status', 'error'); } };
-  const handleDeletePackage = async (id: string) => { if(!confirm('Delete package?')) return; await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchOtherData(); };
+  const handleSavePackage = async (e: React.FormEvent) => { e.preventDefault(); try { const payload = { title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock, image_url: pkgImage }; if (editingPackage) { await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Updated', 'success'); } else { await fetch(`${backendUrl}/api/v1/admin/packages`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Created', 'success'); } setShowPackageModal(false); fetchAllData(); } catch(e) { showToast('Error saving package', 'error'); } };
+  const handleTogglePackageStatus = async (pkg: Package) => { try { await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !pkg.is_active }) }); showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success'); fetchAllData(); } catch(e) { showToast('Error update status', 'error'); } };
+  const handleDeletePackage = async (id: string) => { if(!confirm('Delete package?')) return; await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
+
+  useEffect(() => { if (!isLoading && token) { fetchAllData(); } if (!isLoading && !token) router.push('/login'); }, [isLoading, token]);
 
   if (isLoading || !token) return <div className="min-h-screen bg-black" />;
 
@@ -413,7 +371,7 @@ export default function AdminPage() {
                 <thead className="bg-white/5 text-gray-400 uppercase tracking-wider text-[10px] md:text-xs">
                     <tr>
                         <th className="p-3 md:p-4 w-4">
-                            <input type="checkbox" onChange={handleSelectAll} checked={users.length > 0 && selectedUserIds.size === users.length} className="accent-yellow-500" />
+                            <input type="checkbox" onChange={handleSelectAll} checked={currentFilteredUsers.length > 0 && selectedUserIds.size === currentFilteredUsers.length} className="accent-yellow-500" />
                         </th>
                         <th className="p-3 md:p-4">Identity</th>
                         <th className="p-3 md:p-4">Status & Plan</th>
@@ -422,7 +380,7 @@ export default function AdminPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                    {users.map((u) => {
+                    {currentFilteredUsers.map((u) => {
                         const isExpired = isUserExpired(u);
                         let statusColor = 'bg-gray-800 text-gray-400 border-gray-700';
                         let statusLabel = 'NO PLAN';
@@ -478,11 +436,11 @@ export default function AdminPage() {
                     })}
                 </tbody>
                 </table>
-                {users.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No users found for this filter.</div>}
+                {currentFilteredUsers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No users found in this category.</div>}
              </div>
           </div>
         )}
-        {/* --- SCHEDULES TAB --- */}
+{/* --- SCHEDULES TAB --- */}
         {activeTab === 'schedules' && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {schedules.map((s) => (
@@ -545,7 +503,7 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* --- APPROVE MODAL --- */}
+      {/* --- APPROVE MODAL (NEW) --- */}
       {showApproveModal && editingUser && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative">
