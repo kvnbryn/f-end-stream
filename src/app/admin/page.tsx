@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { getBackendUrl } from '@/lib/config'; 
@@ -73,33 +73,44 @@ const Icons = {
   Gift: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>,
   Youtube: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>,
   Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
-  EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+  EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+  ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+  ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
 };
 
 export default function AdminPage() {
   const { token, logout, isLoading } = useAuth();
   const router = useRouter();
   
-  // State
+  // State Global
   const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers'>('users');
+  
+  // --- STATE USERS (Server-Side Pagination) ---
   const [users, setUsers] = useState<User[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  
+  const [userFilter, setUserFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'EXPIRED'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+
+  // Other Data State
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [qrisUrl, setQrisUrl] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // USER FILTER STATE (NEW)
-  const [userFilter, setUserFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'EXPIRED'>('ALL');
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-
-  // Modal & UI
+  // Modals
   const [showUserModal, setShowUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false); // NEW MODAL
+  const [showApproveModal, setShowApproveModal] = useState(false);
 
   const [mediaMode, setMediaMode] = useState<'schedule' | 'qris' | 'package'>('schedule');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -109,15 +120,12 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingPackage, setEditingPackage] = useState<Package | null>(null);
 
-  // Forms User
+  // Forms
   const [userFormEmail, setUserFormEmail] = useState('');
   const [userFormDuration, setUserFormDuration] = useState(30);
-
-  // Form Bulk
   const [bulkText, setBulkText] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   
-  // Forms Schedule
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
   const [newScheduleTime, setNewScheduleTime] = useState('');
   const [newScheduleThumbnail, setNewScheduleThumbnail] = useState('');
@@ -128,7 +136,6 @@ export default function AdminPage() {
   const [tempLabel, setTempLabel] = useState('');
   const [tempUrl, setTempUrl] = useState('');
 
-  // Offer Forms
   const [pkgTitle, setPkgTitle] = useState('');
   const [pkgPrice, setPkgPrice] = useState('');
   const [pkgDuration, setPkgDuration] = useState('');
@@ -145,16 +152,57 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchAllData = async () => {
+  // --- LOGIC SEARCH DEBOUNCE ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setDebouncedSearch(searchTerm);
+        setPage(1); // Reset ke halaman 1 tiap ketik search
+    }, 500); 
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // --- FETCH USERS (SERVER SIDE) ---
+  const fetchUsers = useCallback(async () => {
+    if (!token) return;
+    setIsLoadingUsers(true);
+    try {
+        // Param Query Sakti
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: '20',
+            search: debouncedSearch,
+            status: userFilter
+        });
+
+        const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
+             headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            setUsers(data.data);
+            setTotalPages(data.meta.totalPages);
+            setTotalUsers(data.meta.total);
+            // Reset selection kalo ganti halaman/filter biar aman
+            setSelectedUserIds(new Set()); 
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Gagal load users', 'error');
+    } finally {
+        setIsLoadingUsers(false);
+    }
+  }, [token, page, debouncedSearch, userFilter, backendUrl]);
+
+  // --- FETCH GLOBAL DATA (Schedule/Package) ---
+  const fetchGlobalData = async () => {
      if (!token) return;
      try {
-         const [resUsers, resSched, resPkg] = await Promise.all([
-             fetch(`${backendUrl}/api/v1/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
+         const [resSched, resPkg] = await Promise.all([
              fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
              fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } })
          ]);
 
-         if(resUsers.ok) setUsers(await resUsers.json());
          if(resSched.ok) setSchedules(await resSched.json());
          if(resPkg.ok) {
              const data = await resPkg.json();
@@ -164,6 +212,19 @@ export default function AdminPage() {
      } catch (e) { console.error(e); }
   };
 
+  // TRIGGER FETCH
+  useEffect(() => {
+      if (token && activeTab === 'users') {
+          fetchUsers();
+      }
+  }, [fetchUsers, activeTab]);
+
+  useEffect(() => {
+      if (token && (activeTab === 'schedules' || activeTab === 'offers')) {
+          fetchGlobalData();
+      }
+  }, [token, activeTab]);
+
   const fetchMedia = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/v1/admin/media`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -171,24 +232,14 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
-  // --- USER VALIDATION HELPERS ---
+  // --- HELPERS ---
   const isUserExpired = (user: User) => {
       if (user.status === 'PENDING') return false;
       if (!user.Subscription) return true;
       return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
   };
 
-  const getFilteredUsers = () => {
-      let filtered = users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase()));
-      if (userFilter === 'PENDING') return filtered.filter(u => u.status === 'PENDING');
-      if (userFilter === 'ACTIVE') return filtered.filter(u => u.status !== 'PENDING' && !isUserExpired(u));
-      if (userFilter === 'EXPIRED') return filtered.filter(u => u.status !== 'PENDING' && isUserExpired(u));
-      return filtered;
-  };
-
-  const currentFilteredUsers = getFilteredUsers();
-
-  // --- BULK ACTIONS ---
+  // --- ACTIONS ---
   const handleSelectUser = (id: string) => {
       const newSet = new Set(selectedUserIds);
       if (newSet.has(id)) newSet.delete(id);
@@ -197,8 +248,9 @@ export default function AdminPage() {
   };
 
   const handleSelectAll = () => {
-      if (selectedUserIds.size === currentFilteredUsers.length) setSelectedUserIds(new Set());
-      else setSelectedUserIds(new Set(currentFilteredUsers.map(u => u.id)));
+      // Select All HANYA untuk halaman ini (Safe way)
+      if (selectedUserIds.size === users.length) setSelectedUserIds(new Set());
+      else setSelectedUserIds(new Set(users.map(u => u.id)));
   };
 
   const handleBulkDelete = async () => {
@@ -211,14 +263,13 @@ export default function AdminPage() {
           });
           showToast('Users Deleted', 'success');
           setSelectedUserIds(new Set());
-          fetchAllData();
+          fetchUsers(); // Refresh Grid
       } catch (e) { showToast('Gagal hapus massal', 'error'); }
   };
 
-  // --- APPROVE USER ---
   const handleApproveClick = (user: User) => {
       setEditingUser(user);
-      setUserFormDuration(30); // Default
+      setUserFormDuration(30); 
       setShowApproveModal(true);
   };
 
@@ -232,62 +283,36 @@ export default function AdminPage() {
           });
           showToast('User Approved!', 'success');
           setShowApproveModal(false);
-          fetchAllData();
+          fetchUsers();
       } catch (e) { showToast('Gagal approve', 'error'); }
   };
 
-  // --- OTHER HANDLERS ---
-  const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-    const formData = new FormData();
-    if (mediaMode === 'qris') formData.append('qrisFile', e.target.files[0]);
-    else formData.append('file', e.target.files[0]);
-    setUploading(true);
-    try {
-      const res = await fetch(`${backendUrl}/api/v1/admin/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-      if (!res.ok) throw new Error('Gagal upload');
-      if (mediaMode === 'qris') {
-          const data = await res.json();
-          await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) });
-          setQrisUrl(data.url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false);
-      } else { showToast('Upload sukses!', 'success'); fetchMedia(); }
-    } catch (err: any) { showToast(err.message, 'error'); } finally { setUploading(false); }
-  };
+  // CRUD User
+  const handleCreateUser = async (e: React.FormEvent) => { e.preventDefault(); try { await fetch(`${backendUrl}/api/v1/admin/users`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) }) }); showToast('User dibuat!', 'success'); setUserFormEmail(''); setShowUserModal(false); fetchUsers(); } catch(e:any){ showToast(e.message,'error');} };
+  const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchUsers(); };
+  const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
+  const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
+  const handleBulkImport = async (e: React.FormEvent) => { e.preventDefault(); setBulkLoading(true); try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchUsers(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); } };
 
-  const handleSelectMedia = async (url: string) => {
-    if (mediaMode === 'schedule') { setNewScheduleThumbnail(url); setShowMediaModal(false); }
-    else if (mediaMode === 'package') { setPkgImage(url); setShowMediaModal(false); }
-    else if (mediaMode === 'qris') {
-        await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-        setQrisUrl(url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false);
-    }
-  };
-  
-  const handleCreateUser = async (e: React.FormEvent) => { e.preventDefault(); try { await fetch(`${backendUrl}/api/v1/admin/users`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) }) }); showToast('User dibuat!', 'success'); setUserFormEmail(''); setShowUserModal(false); fetchAllData(); } catch(e:any){ showToast(e.message,'error');} };
-  
-  const handleBulkImport = async (e: React.FormEvent) => {
-      e.preventDefault(); setBulkLoading(true);
-      try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchAllData(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); }
-  };
+  // CRUD Schedule (sama seperti dulu, panggil fetchGlobalData)
+  const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchGlobalData(); };
+  const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchGlobalData(); };
+  const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchGlobalData(); };
 
-  const handleEditUserClick = (user: User) => { setEditingUser(user); setUserFormEmail(user.email); setUserFormDuration(0); setShowEditUserModal(true); };
-  const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchAllData(); };
-  const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
-  const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
-  
+  // CRUD Package
+  const handleOpenPackageModal = (pkg?: Package) => { if (pkg) { setEditingPackage(pkg); setPkgTitle(pkg.title); setPkgPrice(pkg.price.toString()); setPkgDuration(pkg.duration.toString()); setPkgFeatures(pkg.description || ''); setPkgTopic(pkg.topic || ''); setPkgIsLimited(pkg.is_limited || false); setPkgStock(pkg.stock?.toString() || ''); setPkgImage(pkg.image_url || ''); } else { setEditingPackage(null); setPkgTitle(''); setPkgPrice(''); setPkgDuration(''); setPkgFeatures(''); setPkgTopic(''); setPkgIsLimited(false); setPkgStock(''); setPkgImage(''); } setShowPackageModal(true); };
+  const handleSavePackage = async (e: React.FormEvent) => { e.preventDefault(); try { const payload = { title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock, image_url: pkgImage }; if (editingPackage) { await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Updated', 'success'); } else { await fetch(`${backendUrl}/api/v1/admin/packages`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Created', 'success'); } setShowPackageModal(false); fetchGlobalData(); } catch(e) { showToast('Error saving package', 'error'); } };
+  const handleTogglePackageStatus = async (pkg: Package) => { try { await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !pkg.is_active }) }); showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success'); fetchGlobalData(); } catch(e) { showToast('Error update status', 'error'); } };
+  const handleDeletePackage = async (id: string) => { if(!confirm('Delete package?')) return; await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchGlobalData(); };
+
+  // Media Utils
+  const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => { if (!e.target.files?.[0]) return; const formData = new FormData(); if (mediaMode === 'qris') formData.append('qrisFile', e.target.files[0]); else formData.append('file', e.target.files[0]); setUploading(true); try { const res = await fetch(`${backendUrl}/api/v1/admin/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData }); if (!res.ok) throw new Error('Gagal upload'); if (mediaMode === 'qris') { const data = await res.json(); await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) }); setQrisUrl(data.url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false); } else { showToast('Upload sukses!', 'success'); fetchMedia(); } } catch (err: any) { showToast(err.message, 'error'); } finally { setUploading(false); } };
+  const handleSelectMedia = async (url: string) => { if (mediaMode === 'schedule') { setNewScheduleThumbnail(url); setShowMediaModal(false); } else if (mediaMode === 'package') { setPkgImage(url); setShowMediaModal(false); } else if (mediaMode === 'qris') { await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); setQrisUrl(url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false); } };
   const addQuality = () => { if(tempLabel && tempUrl) { setQualities([...qualities, { label: tempLabel, url: tempUrl }]); setTempLabel(''); setTempUrl(''); } };
   const removeQuality = (idx: number) => { setQualities(qualities.filter((_, i) => i !== idx)); };
+  const handleEditUserClick = (user: User) => { setEditingUser(user); setUserFormEmail(user.email); setUserFormDuration(0); setShowEditUserModal(true); };
 
-  const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchAllData(); };
-  const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
-  const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
-
-  const handleOpenPackageModal = (pkg?: Package) => { if (pkg) { setEditingPackage(pkg); setPkgTitle(pkg.title); setPkgPrice(pkg.price.toString()); setPkgDuration(pkg.duration.toString()); setPkgFeatures(pkg.description || ''); setPkgTopic(pkg.topic || ''); setPkgIsLimited(pkg.is_limited || false); setPkgStock(pkg.stock?.toString() || ''); setPkgImage(pkg.image_url || ''); } else { setEditingPackage(null); setPkgTitle(''); setPkgPrice(''); setPkgDuration(''); setPkgFeatures(''); setPkgTopic(''); setPkgIsLimited(false); setPkgStock(''); setPkgImage(''); } setShowPackageModal(true); };
-  const handleSavePackage = async (e: React.FormEvent) => { e.preventDefault(); try { const payload = { title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock, image_url: pkgImage }; if (editingPackage) { await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Updated', 'success'); } else { await fetch(`${backendUrl}/api/v1/admin/packages`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Created', 'success'); } setShowPackageModal(false); fetchAllData(); } catch(e) { showToast('Error saving package', 'error'); } };
-  const handleTogglePackageStatus = async (pkg: Package) => { try { await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !pkg.is_active }) }); showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success'); fetchAllData(); } catch(e) { showToast('Error update status', 'error'); } };
-  const handleDeletePackage = async (id: string) => { if(!confirm('Delete package?')) return; await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
-
-  useEffect(() => { if (!isLoading && token) { fetchAllData(); } if (!isLoading && !token) router.push('/login'); }, [isLoading, token]);
+  useEffect(() => { if (!isLoading && !token) router.push('/login'); }, [isLoading, token]);
 
   if (isLoading || !token) return <div className="min-h-screen bg-black" />;
 
@@ -321,7 +346,7 @@ export default function AdminPage() {
                  <>
                     <div className="relative group flex-1 sm:flex-none min-w-[150px]">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icons.Search /></div>
-                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-[#111] border border-gray-700 text-white text-sm rounded-lg block pl-10 p-2.5 w-full sm:w-64 outline-none focus:border-yellow-500 transition-colors" />
+                        <input type="text" placeholder="Search Email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-[#111] border border-gray-700 text-white text-sm rounded-lg block pl-10 p-2.5 w-full sm:w-64 outline-none focus:border-yellow-500 transition-colors" />
                     </div>
                     <button onClick={() => setShowBulkModal(true)} className="bg-gray-800 text-white hover:bg-gray-700 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shrink-0 border border-gray-700">
                         <Icons.Upload /> <span className="hidden sm:inline">Bulk Import</span>
@@ -348,7 +373,7 @@ export default function AdminPage() {
                  {(['ALL', 'ACTIVE', 'PENDING', 'EXPIRED'] as const).map(f => (
                      <button 
                         key={f} 
-                        onClick={() => { setUserFilter(f); setSelectedUserIds(new Set()); }}
+                        onClick={() => { setUserFilter(f); setPage(1); }} // Reset Page saat ganti filter
                         className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${userFilter === f ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800 hover:border-gray-600'}`}
                      >
                         {f}
@@ -366,12 +391,18 @@ export default function AdminPage() {
                  </div>
              )}
 
-             <div className="overflow-x-auto rounded-xl border border-gray-800 bg-[#0a0a0a] shadow-2xl pb-2">
+             <div className="overflow-x-auto rounded-xl border border-gray-800 bg-[#0a0a0a] shadow-2xl pb-2 relative min-h-[300px]">
+                {isLoadingUsers && (
+                    <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center backdrop-blur-sm">
+                        <div className="text-yellow-500 font-bold animate-pulse">Loading Data...</div>
+                    </div>
+                )}
+                
                 <table className="w-full text-left text-xs md:text-sm whitespace-nowrap">
                 <thead className="bg-white/5 text-gray-400 uppercase tracking-wider text-[10px] md:text-xs">
                     <tr>
                         <th className="p-3 md:p-4 w-4">
-                            <input type="checkbox" onChange={handleSelectAll} checked={currentFilteredUsers.length > 0 && selectedUserIds.size === currentFilteredUsers.length} className="accent-yellow-500" />
+                            <input type="checkbox" onChange={handleSelectAll} checked={users.length > 0 && selectedUserIds.size === users.length} className="accent-yellow-500" />
                         </th>
                         <th className="p-3 md:p-4">Identity</th>
                         <th className="p-3 md:p-4">Status & Plan</th>
@@ -380,7 +411,7 @@ export default function AdminPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                    {currentFilteredUsers.map((u) => {
+                    {users.map((u) => {
                         const isExpired = isUserExpired(u);
                         let statusColor = 'bg-gray-800 text-gray-400 border-gray-700';
                         let statusLabel = 'NO PLAN';
@@ -436,11 +467,36 @@ export default function AdminPage() {
                     })}
                 </tbody>
                 </table>
-                {currentFilteredUsers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No users found in this category.</div>}
+                {users.length === 0 && !isLoadingUsers && <div className="p-8 text-center text-gray-600 text-sm">No users found.</div>}
+             </div>
+
+             {/* --- PAGINATION CONTROLS --- */}
+             <div className="flex items-center justify-between p-2 border-t border-gray-800">
+                 <div className="text-xs text-gray-500">
+                    Total: <span className="text-white font-bold">{totalUsers}</span> Users
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <button 
+                        disabled={page <= 1} 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                    >
+                        <Icons.ChevronLeft />
+                    </button>
+                    <span className="text-xs font-mono text-gray-400">Page {page} of {totalPages}</span>
+                    <button 
+                        disabled={page >= totalPages} 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        className="p-2 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                    >
+                        <Icons.ChevronRight />
+                    </button>
+                 </div>
              </div>
           </div>
         )}
-{/* --- SCHEDULES TAB --- */}
+
+        {/* --- SCHEDULES TAB --- */}
         {activeTab === 'schedules' && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {schedules.map((s) => (
