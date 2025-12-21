@@ -166,7 +166,6 @@ export default function AdminPage() {
     if (!token) return;
     setIsLoadingUsers(true);
     try {
-        // Param Query Sakti
         const params = new URLSearchParams({
             page: page.toString(),
             limit: '20',
@@ -179,11 +178,24 @@ export default function AdminPage() {
         });
         
         const data = await res.json();
+        
         if (res.ok) {
-            setUsers(data.data);
-            setTotalPages(data.meta.totalPages);
-            setTotalUsers(data.meta.total);
-            // Reset selection kalo ganti halaman/filter biar aman
+            // GENIUS FIX: DETEKSI FORMAT DATA
+            // Jika backend masih ngirim Array (Versi Lama), kita handle biar gak error
+            if (Array.isArray(data)) {
+                 // Fallback ke mode lama (Slow but working)
+                 setUsers(data);
+                 setTotalPages(1);
+                 setTotalUsers(data.length);
+                 if (data.length > 50) showToast('Warning: Backend belum di-restart (Mode Lambat)', 'error');
+            } else if (data.data && data.meta) {
+                 // Format Baru (Optimized)
+                 setUsers(data.data);
+                 setTotalPages(data.meta.totalPages);
+                 setTotalUsers(data.meta.total);
+            } else {
+                 setUsers([]);
+            }
             setSelectedUserIds(new Set()); 
         }
     } catch (e) {
@@ -248,7 +260,6 @@ export default function AdminPage() {
   };
 
   const handleSelectAll = () => {
-      // Select All HANYA untuk halaman ini (Safe way)
       if (selectedUserIds.size === users.length) setSelectedUserIds(new Set());
       else setSelectedUserIds(new Set(users.map(u => u.id)));
   };
@@ -402,7 +413,7 @@ export default function AdminPage() {
                 <thead className="bg-white/5 text-gray-400 uppercase tracking-wider text-[10px] md:text-xs">
                     <tr>
                         <th className="p-3 md:p-4 w-4">
-                            <input type="checkbox" onChange={handleSelectAll} checked={users.length > 0 && selectedUserIds.size === users.length} className="accent-yellow-500" />
+                            <input type="checkbox" onChange={handleSelectAll} checked={users && users.length > 0 && selectedUserIds.size === users.length} className="accent-yellow-500" />
                         </th>
                         <th className="p-3 md:p-4">Identity</th>
                         <th className="p-3 md:p-4">Status & Plan</th>
@@ -411,7 +422,7 @@ export default function AdminPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                    {users.map((u) => {
+                    {users && users.length > 0 ? (users.map((u) => {
                         const isExpired = isUserExpired(u);
                         let statusColor = 'bg-gray-800 text-gray-400 border-gray-700';
                         let statusLabel = 'NO PLAN';
@@ -464,10 +475,11 @@ export default function AdminPage() {
                                 </td>
                             </tr>
                         );
-                    })}
+                    })) : (
+                        <tr><td colSpan={5} className="p-8 text-center text-gray-600 text-sm">No users found.</td></tr>
+                    )}
                 </tbody>
                 </table>
-                {users.length === 0 && !isLoadingUsers && <div className="p-8 text-center text-gray-600 text-sm">No users found.</div>}
              </div>
 
              {/* --- PAGINATION CONTROLS --- */}
