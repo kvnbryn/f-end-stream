@@ -6,9 +6,25 @@ import { useRouter } from 'next/navigation';
 import { getBackendUrl } from '@/lib/config'; 
 
 // --- TIPE DATA ---
-type Subscription = { id: string; plan_type: string; start_time: string; end_time: string; };
-type User = { id: string; email: string; role: string; registered_device_id: string | null; Subscription: Subscription | null; };
+type Subscription = { 
+    id: string; 
+    plan_type: string; 
+    start_time: string; 
+    end_time: string; 
+};
+
+type User = { 
+    id: string; 
+    email: string; 
+    role: string; 
+    status: string; // 'ACTIVE' | 'PENDING'
+    last_order_info: string | null;
+    registered_device_id: string | null; 
+    Subscription: Subscription | null; 
+};
+
 type Quality = { label: string; url: string }; 
+
 type Schedule = { 
     id: string; 
     title: string; 
@@ -21,7 +37,9 @@ type Schedule = {
     thumbnail: string | null; 
     price: number; 
 };
+
 type MediaFile = { name: string; url: string; time: number; };
+
 type Package = { 
     id: string; 
     title: string; 
@@ -32,7 +50,7 @@ type Package = {
     is_limited?: boolean;
     stock?: number;
     is_active?: boolean;
-    image_url?: string; // NEW field
+    image_url?: string; 
 };
 
 // --- ICONS ---
@@ -42,7 +60,7 @@ const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
   Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-  Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
+  Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   Lock: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
   Unlock: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
   Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
@@ -54,8 +72,6 @@ const Icons = {
   Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
   Gift: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>,
   Youtube: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>,
-  Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
-  Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
   Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
   EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
 };
@@ -72,6 +88,10 @@ export default function AdminPage() {
   const [qrisUrl, setQrisUrl] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // USER FILTER STATE (NEW)
+  const [userFilter, setUserFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'EXPIRED'>('ALL');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+
   // Modal & UI
   const [showUserModal, setShowUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -79,6 +99,7 @@ export default function AdminPage() {
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false); // NEW MODAL
 
   const [mediaMode, setMediaMode] = useState<'schedule' | 'qris' | 'package'>('schedule');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -103,13 +124,11 @@ export default function AdminPage() {
   const [newSchedulePrice, setNewSchedulePrice] = useState('');
   const [streamSource, setStreamSource] = useState<'internal' | 'external' | 'youtube'>('internal');
   const [newScheduleUrl, setNewScheduleUrl] = useState(''); 
-  
-  // Multi Quality State
   const [qualities, setQualities] = useState<Quality[]>([]);
   const [tempLabel, setTempLabel] = useState('');
   const [tempUrl, setTempUrl] = useState('');
 
-  // OFFER FORMS
+  // Offer Forms
   const [pkgTitle, setPkgTitle] = useState('');
   const [pkgPrice, setPkgPrice] = useState('');
   const [pkgDuration, setPkgDuration] = useState('');
@@ -117,7 +136,7 @@ export default function AdminPage() {
   const [pkgTopic, setPkgTopic] = useState('');
   const [pkgIsLimited, setPkgIsLimited] = useState(false);
   const [pkgStock, setPkgStock] = useState('');
-  const [pkgImage, setPkgImage] = useState(''); // NEW STATE
+  const [pkgImage, setPkgImage] = useState('');
   
   const backendUrl = getBackendUrl();
 
@@ -129,9 +148,6 @@ export default function AdminPage() {
   const fetchAllData = async () => {
      if (!token) return;
      try {
-         // --- OPTIMIZATION START: PARALLEL FETCHING ---
-         // Menggunakan Promise.all agar semua request berjalan bersamaan, tidak antri satu-satu.
-         // Ini sangat membantu karena Frontend (Vercel) dan Backend (VPS) terpisah jarak.
          const [resUsers, resSched, resPkg] = await Promise.all([
              fetch(`${backendUrl}/api/v1/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
              fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -145,12 +161,7 @@ export default function AdminPage() {
              setPackages(data.packages);
              setQrisUrl(data.qrisUrl);
          }
-         // --- OPTIMIZATION END ---
-
-     } catch (e) { 
-         console.error(e); 
-         showToast("Gagal memuat data. Periksa koneksi.", "error");
-     }
+     } catch (e) { console.error(e); }
   };
 
   const fetchMedia = async () => {
@@ -160,223 +171,123 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
+  // --- USER VALIDATION HELPERS ---
+  const isUserExpired = (user: User) => {
+      if (user.status === 'PENDING') return false;
+      if (!user.Subscription) return true;
+      return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
+  };
+
+  const getFilteredUsers = () => {
+      let filtered = users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (userFilter === 'PENDING') return filtered.filter(u => u.status === 'PENDING');
+      if (userFilter === 'ACTIVE') return filtered.filter(u => u.status !== 'PENDING' && !isUserExpired(u));
+      if (userFilter === 'EXPIRED') return filtered.filter(u => u.status !== 'PENDING' && isUserExpired(u));
+      return filtered;
+  };
+
+  const currentFilteredUsers = getFilteredUsers();
+
+  // --- BULK ACTIONS ---
+  const handleSelectUser = (id: string) => {
+      const newSet = new Set(selectedUserIds);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      setSelectedUserIds(newSet);
+  };
+
+  const handleSelectAll = () => {
+      if (selectedUserIds.size === currentFilteredUsers.length) setSelectedUserIds(new Set());
+      else setSelectedUserIds(new Set(currentFilteredUsers.map(u => u.id)));
+  };
+
+  const handleBulkDelete = async () => {
+      if (!confirm(`Yakin hapus ${selectedUserIds.size} user terpilih?`)) return;
+      try {
+          await fetch(`${backendUrl}/api/v1/admin/users/bulk`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: Array.from(selectedUserIds) })
+          });
+          showToast('Users Deleted', 'success');
+          setSelectedUserIds(new Set());
+          fetchAllData();
+      } catch (e) { showToast('Gagal hapus massal', 'error'); }
+  };
+
+  // --- APPROVE USER ---
+  const handleApproveClick = (user: User) => {
+      setEditingUser(user);
+      setUserFormDuration(30); // Default
+      setShowApproveModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+      if (!editingUser) return;
+      try {
+          await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}/approve`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ durationDays: userFormDuration })
+          });
+          showToast('User Approved!', 'success');
+          setShowApproveModal(false);
+          fetchAllData();
+      } catch (e) { showToast('Gagal approve', 'error'); }
+  };
+
+  // --- OTHER HANDLERS ---
   const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     const formData = new FormData();
     if (mediaMode === 'qris') formData.append('qrisFile', e.target.files[0]);
     else formData.append('file', e.target.files[0]);
-    
     setUploading(true);
     try {
-      const res = await fetch(`${backendUrl}/api/v1/admin/upload`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData
-      });
+      const res = await fetch(`${backendUrl}/api/v1/admin/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       if (!res.ok) throw new Error('Gagal upload');
-      
       if (mediaMode === 'qris') {
           const data = await res.json();
-          await fetch(`${backendUrl}/api/v1/admin/settings/qris`, {
-              method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url })
-          });
-          setQrisUrl(data.url);
-          showToast('QRIS Updated!', 'success');
-          setShowMediaModal(false);
-      } else {
-          showToast('Upload sukses!', 'success');
-          fetchMedia();
-      }
-    } catch (err: any) { showToast(err.message, 'error'); } 
-    finally { setUploading(false); }
+          await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) });
+          setQrisUrl(data.url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false);
+      } else { showToast('Upload sukses!', 'success'); fetchMedia(); }
+    } catch (err: any) { showToast(err.message, 'error'); } finally { setUploading(false); }
   };
 
   const handleSelectMedia = async (url: string) => {
-    if (mediaMode === 'schedule') {
-        setNewScheduleThumbnail(url);
-        setShowMediaModal(false);
-    } else if (mediaMode === 'package') {
-        setPkgImage(url); // Set Image untuk Paket
-        setShowMediaModal(false);
-    } else if (mediaMode === 'qris') {
-        try {
-            await fetch(`${backendUrl}/api/v1/admin/settings/qris`, {
-                method: 'POST', 
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ url })
-            });
-            setQrisUrl(url);
-            showToast('QRIS Updated!', 'success');
-            setShowMediaModal(false);
-        } catch(e) {
-            showToast('Failed to update QRIS', 'error');
-        }
+    if (mediaMode === 'schedule') { setNewScheduleThumbnail(url); setShowMediaModal(false); }
+    else if (mediaMode === 'package') { setPkgImage(url); setShowMediaModal(false); }
+    else if (mediaMode === 'qris') {
+        await fetch(`${backendUrl}/api/v1/admin/settings/qris`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+        setQrisUrl(url); showToast('QRIS Updated!', 'success'); setShowMediaModal(false);
     }
   };
   
   const handleCreateUser = async (e: React.FormEvent) => { e.preventDefault(); try { await fetch(`${backendUrl}/api/v1/admin/users`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) }) }); showToast('User dibuat!', 'success'); setUserFormEmail(''); setShowUserModal(false); fetchAllData(); } catch(e:any){ showToast(e.message,'error');} };
   
   const handleBulkImport = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setBulkLoading(true);
-      try {
-          const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ rawText: bulkText })
-          });
-          const data = await res.json();
-          showToast(data.message, 'success');
-          setBulkText('');
-          setShowBulkModal(false);
-          fetchAllData();
-      } catch (e) {
-          showToast('Import gagal', 'error');
-      } finally {
-          setBulkLoading(false);
-      }
+      e.preventDefault(); setBulkLoading(true);
+      try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchAllData(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); }
   };
 
   const handleEditUserClick = (user: User) => { setEditingUser(user); setUserFormEmail(user.email); setUserFormDuration(0); setShowEditUserModal(true); };
-  
-  const handleUpdateUser = async (e: React.FormEvent) => { 
-      e.preventDefault(); 
-      if(!editingUser) return; 
-      await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { 
-          method: 'PUT', 
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) 
-      }); 
-      showToast('Updated / Reactivated!', 'success'); 
-      setShowEditUserModal(false); 
-      fetchAllData(); 
-  };
-
+  const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchAllData(); };
   const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
   const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
   
-  const addQuality = () => {
-      if(tempLabel && tempUrl) {
-          setQualities([...qualities, { label: tempLabel, url: tempUrl }]);
-          setTempLabel(''); setTempUrl('');
-      }
-  };
-  const removeQuality = (idx: number) => {
-      setQualities(qualities.filter((_, i) => i !== idx));
-  };
+  const addQuality = () => { if(tempLabel && tempUrl) { setQualities([...qualities, { label: tempLabel, url: tempUrl }]); setTempLabel(''); setTempUrl(''); } };
+  const removeQuality = (idx: number) => { setQualities(qualities.filter((_, i) => i !== idx)); };
 
-  const handleCreateSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetch(`${backendUrl}/api/v1/admin/schedules`, { 
-        method: 'POST', 
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ 
-            title: newScheduleTitle, 
-            start_time: new Date(newScheduleTime).toISOString(), 
-            thumbnail: newScheduleThumbnail, 
-            price: Number(newSchedulePrice), 
-            stream_source: streamSource, 
-            stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, 
-            custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined,
-            qualities: streamSource === 'external' ? qualities : [] 
-        }) 
-    }); 
-    showToast('Created!', 'success'); 
-    setShowScheduleModal(false); 
-    setQualities([]); 
-    fetchAllData(); 
-  };
-  
+  const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchAllData(); };
   const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
   const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
 
-  const handleOpenPackageModal = (pkg?: Package) => {
-      if (pkg) {
-          setEditingPackage(pkg);
-          setPkgTitle(pkg.title);
-          setPkgPrice(pkg.price.toString());
-          setPkgDuration(pkg.duration.toString());
-          setPkgFeatures(pkg.description || '');
-          setPkgTopic(pkg.topic || '');
-          setPkgIsLimited(pkg.is_limited || false);
-          setPkgStock(pkg.stock?.toString() || '');
-          setPkgImage(pkg.image_url || ''); // Set image for edit
-      } else {
-          setEditingPackage(null);
-          setPkgTitle(''); setPkgPrice(''); setPkgDuration(''); 
-          setPkgFeatures(''); setPkgTopic(''); setPkgIsLimited(false); setPkgStock('');
-          setPkgImage(''); // Clear image for create
-      }
-      setShowPackageModal(true);
-  };
-
-  const handleSavePackage = async (e: React.FormEvent) => { 
-      e.preventDefault(); 
-      try { 
-          const payload = { 
-              title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, 
-              topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock,
-              image_url: pkgImage // Save Image
-          };
-
-          if (editingPackage) {
-              await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { 
-                  method: 'PUT', 
-                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                  body: JSON.stringify(payload) 
-              }); 
-              showToast('Package Updated', 'success');
-          } else {
-              await fetch(`${backendUrl}/api/v1/admin/packages`, { 
-                  method: 'POST', 
-                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                  body: JSON.stringify(payload) 
-              }); 
-              showToast('Package Created', 'success'); 
-          }
-          
-          setShowPackageModal(false); 
-          fetchAllData(); 
-      } catch(e) { showToast('Error saving package', 'error'); } 
-  };
-
-  const handleTogglePackageStatus = async (pkg: Package) => {
-      try {
-          await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, {
-              method: 'PUT',
-              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ is_active: !pkg.is_active }) 
-          });
-          showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success');
-          fetchAllData();
-      } catch(e) { showToast('Error update status', 'error'); }
-  };
-
+  const handleOpenPackageModal = (pkg?: Package) => { if (pkg) { setEditingPackage(pkg); setPkgTitle(pkg.title); setPkgPrice(pkg.price.toString()); setPkgDuration(pkg.duration.toString()); setPkgFeatures(pkg.description || ''); setPkgTopic(pkg.topic || ''); setPkgIsLimited(pkg.is_limited || false); setPkgStock(pkg.stock?.toString() || ''); setPkgImage(pkg.image_url || ''); } else { setEditingPackage(null); setPkgTitle(''); setPkgPrice(''); setPkgDuration(''); setPkgFeatures(''); setPkgTopic(''); setPkgIsLimited(false); setPkgStock(''); setPkgImage(''); } setShowPackageModal(true); };
+  const handleSavePackage = async (e: React.FormEvent) => { e.preventDefault(); try { const payload = { title: pkgTitle, price: pkgPrice, duration: pkgDuration, description: pkgFeatures, topic: pkgTopic, is_limited: pkgIsLimited, stock: pkgStock, image_url: pkgImage }; if (editingPackage) { await fetch(`${backendUrl}/api/v1/admin/packages/${editingPackage.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Updated', 'success'); } else { await fetch(`${backendUrl}/api/v1/admin/packages`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('Package Created', 'success'); } setShowPackageModal(false); fetchAllData(); } catch(e) { showToast('Error saving package', 'error'); } };
+  const handleTogglePackageStatus = async (pkg: Package) => { try { await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !pkg.is_active }) }); showToast(pkg.is_active ? 'Package Disabled' : 'Package Activated', 'success'); fetchAllData(); } catch(e) { showToast('Error update status', 'error'); } };
   const handleDeletePackage = async (id: string) => { if(!confirm('Delete package?')) return; await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchAllData(); };
 
-  useEffect(() => {
-    if (!isLoading && token) { fetchAllData(); }
-    if (!isLoading && !token) router.push('/login');
-  }, [isLoading, token]);
-
-  const filteredUsers = users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase()));
-
-  const getUserStatus = (user: User) => {
-      if (!user.Subscription) return { label: 'NO PLAN', color: 'bg-gray-800 text-gray-400 border-gray-700', timeLeft: '' };
-      
-      const now = new Date().getTime();
-      const end = new Date(user.Subscription.end_time).getTime();
-      const diff = end - now;
-
-      if (diff <= 0) {
-          return { label: 'EXPIRED', color: 'bg-red-900/30 text-red-500 border-red-900 font-bold animate-pulse', timeLeft: '0 Days' };
-      }
-      
-      const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      return { 
-          label: user.Subscription.plan_type, 
-          color: 'bg-green-900/30 text-green-400 border-green-800',
-          timeLeft: `${daysLeft} Days Left`
-      };
-  };
+  useEffect(() => { if (!isLoading && token) { fetchAllData(); } if (!isLoading && !token) router.push('/login'); }, [isLoading, token]);
 
   if (isLoading || !token) return <div className="min-h-screen bg-black" />;
 
@@ -431,52 +342,105 @@ export default function AdminPage() {
 
         {/* --- USERS TAB --- */}
         {activeTab === 'users' && (
-          <div className="overflow-x-auto rounded-xl border border-gray-800 bg-[#0a0a0a] shadow-2xl pb-2">
-            <table className="w-full text-left text-xs md:text-sm whitespace-nowrap">
-              <thead className="bg-white/5 text-gray-400 uppercase tracking-wider text-[10px] md:text-xs">
-                  <tr><th className="p-3 md:p-4">Identity</th><th className="p-3 md:p-4">Plan & Time</th><th className="p-3 md:p-4 text-center">Device Status</th><th className="p-3 md:p-4 text-right">Actions</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {filteredUsers.map((u) => {
-                    const status = getUserStatus(u);
-                    return (
-                        <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                            <td className="p-3 md:p-4 font-medium text-white max-w-[120px] md:max-w-none truncate" title={u.email}>{u.email}</td>
-                            <td className="p-3 md:p-4">
-                                <div className="flex flex-col items-start gap-1">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs border font-bold ${status.color}`}>
-                                        {status.label}
+          <div className="space-y-4">
+             {/* Filter Tabs */}
+             <div className="flex gap-2 overflow-x-auto pb-2">
+                 {(['ALL', 'ACTIVE', 'PENDING', 'EXPIRED'] as const).map(f => (
+                     <button 
+                        key={f} 
+                        onClick={() => { setUserFilter(f); setSelectedUserIds(new Set()); }}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${userFilter === f ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800 hover:border-gray-600'}`}
+                     >
+                        {f}
+                     </button>
+                 ))}
+             </div>
+
+             {/* Bulk Action Header */}
+             {selectedUserIds.size > 0 && (
+                 <div className="bg-red-900/20 border border-red-900 rounded-lg p-3 flex justify-between items-center animate-in slide-in-from-top-2">
+                     <span className="text-red-400 text-sm font-bold ml-2">{selectedUserIds.size} Users Selected</span>
+                     <button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2">
+                         <Icons.Trash /> DELETE SELECTED
+                     </button>
+                 </div>
+             )}
+
+             <div className="overflow-x-auto rounded-xl border border-gray-800 bg-[#0a0a0a] shadow-2xl pb-2">
+                <table className="w-full text-left text-xs md:text-sm whitespace-nowrap">
+                <thead className="bg-white/5 text-gray-400 uppercase tracking-wider text-[10px] md:text-xs">
+                    <tr>
+                        <th className="p-3 md:p-4 w-4">
+                            <input type="checkbox" onChange={handleSelectAll} checked={currentFilteredUsers.length > 0 && selectedUserIds.size === currentFilteredUsers.length} className="accent-yellow-500" />
+                        </th>
+                        <th className="p-3 md:p-4">Identity</th>
+                        <th className="p-3 md:p-4">Status & Plan</th>
+                        <th className="p-3 md:p-4 text-center">Device</th>
+                        <th className="p-3 md:p-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {currentFilteredUsers.map((u) => {
+                        const isExpired = isUserExpired(u);
+                        let statusColor = 'bg-gray-800 text-gray-400 border-gray-700';
+                        let statusLabel = 'NO PLAN';
+
+                        if (u.status === 'PENDING') {
+                            statusColor = 'bg-yellow-900/30 text-yellow-500 border-yellow-800 animate-pulse';
+                            statusLabel = 'PENDING APPROVAL';
+                        } else if (isExpired) {
+                            statusColor = 'bg-red-900/30 text-red-500 border-red-900';
+                            statusLabel = 'EXPIRED';
+                        } else if (u.Subscription) {
+                            statusColor = 'bg-green-900/30 text-green-400 border-green-800';
+                            statusLabel = u.Subscription.plan_type;
+                        }
+
+                        return (
+                            <tr key={u.id} className={`hover:bg-white/5 transition-colors ${selectedUserIds.has(u.id) ? 'bg-yellow-900/10' : ''}`}>
+                                <td className="p-3 md:p-4">
+                                    <input type="checkbox" checked={selectedUserIds.has(u.id)} onChange={() => handleSelectUser(u.id)} className="accent-yellow-500" />
+                                </td>
+                                <td className="p-3 md:p-4">
+                                    <div className="font-medium text-white max-w-[150px] truncate" title={u.email}>{u.email}</div>
+                                    {u.last_order_info && <div className="text-[10px] text-gray-500 mt-1 italic truncate max-w-[150px]">{u.last_order_info}</div>}
+                                </td>
+                                <td className="p-3 md:p-4">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs border font-bold ${statusColor}`}>
+                                        {statusLabel}
                                     </span>
-                                    {status.timeLeft && <span className="text-[10px] text-gray-400 font-mono pl-1">{status.timeLeft}</span>}
-                                </div>
-                            </td>
-                            <td className="p-3 md:p-4 text-center">
-                                {u.registered_device_id ? (
-                                    <button onClick={() => handleResetDevice(u.id)} className="inline-flex items-center justify-center gap-1.5 text-green-500 bg-green-900/20 px-3 py-1.5 rounded border border-green-900/50 text-[10px] md:text-xs hover:bg-red-900/30 hover:text-red-400 transition-colors">
-                                        <Icons.Lock /> <span>Locked</span>
-                                    </button>
-                                ) : (
-                                    <span className="inline-flex items-center justify-center gap-1.5 text-gray-600 text-[10px] md:text-xs opacity-50">
-                                        <Icons.Unlock /> <span>Free</span>
-                                    </span>
-                                )}
-                            </td>
-                            <td className="p-3 md:p-4 text-right">
-                                <div className="flex justify-end gap-1 md:gap-2">
-                                    <button onClick={() => handleEditUserClick(u)} className="text-gray-500 hover:text-yellow-500 p-1.5 md:p-2 hover:bg-yellow-500/10 rounded transition-colors"><Icons.Edit /></button>
-                                    <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-500 p-1.5 md:p-2 hover:bg-red-500/10 rounded transition-colors"><Icons.Trash /></button>
-                                </div>
-                            </td>
-                        </tr>
-                    );
-                })}
-              </tbody>
-            </table>
-            {filteredUsers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No users found.</div>}
+                                </td>
+                                <td className="p-3 md:p-4 text-center">
+                                    {u.registered_device_id ? (
+                                        <button onClick={() => handleResetDevice(u.id)} className="inline-flex items-center justify-center gap-1 text-green-500 bg-green-900/20 px-2 py-1 rounded border border-green-900/50 text-[10px] hover:bg-red-900/30 hover:text-red-400 transition-colors"><Icons.Lock /> Locked</button>
+                                    ) : (
+                                        <span className="text-gray-600 text-[10px] opacity-50"><Icons.Unlock /> Free</span>
+                                    )}
+                                </td>
+                                <td className="p-3 md:p-4 text-right">
+                                    <div className="flex justify-end gap-2">
+                                        {u.status === 'PENDING' ? (
+                                            <button onClick={() => handleApproveClick(u)} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 shadow-lg shadow-green-900/20">
+                                                <Icons.Check /> APPROVE
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => handleEditUserClick(u)} className="text-gray-500 hover:text-yellow-500 p-1.5 hover:bg-yellow-500/10 rounded"><Icons.Edit /></button>
+                                                <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-500 p-1.5 hover:bg-red-500/10 rounded"><Icons.Trash /></button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+                </table>
+                {currentFilteredUsers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No users found in this category.</div>}
+             </div>
           </div>
         )}
-
-        {/* --- SCHEDULES TAB --- */}
+{/* --- SCHEDULES TAB --- */}
         {activeTab === 'schedules' && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {schedules.map((s) => (
@@ -525,26 +489,12 @@ export default function AdminPage() {
                                     <button onClick={() => handleOpenPackageModal(p)} className="text-gray-500 hover:text-yellow-500"><Icons.Edit /></button>
                                     <button onClick={() => handleDeletePackage(p.id)} className="text-gray-500 hover:text-red-500"><Icons.Trash /></button>
                                  </div>
-
-                                 {/* IMAGE PREVIEW IN CARD */}
-                                 {p.image_url && (
-                                     <div className="h-24 w-full mb-4 rounded-lg overflow-hidden relative">
-                                         <img src={p.image_url} className="w-full h-full object-cover opacity-60" />
-                                     </div>
-                                 )}
-
+                                 {p.image_url && (<div className="h-24 w-full mb-4 rounded-lg overflow-hidden relative"><img src={p.image_url} className="w-full h-full object-cover opacity-60" /></div>)}
                                  {p.topic && <span className="text-[10px] font-bold bg-white/10 px-2 py-1 rounded text-yellow-500 uppercase tracking-wider self-start mb-2">{p.topic}</span>}
                                  <h3 className="text-lg md:text-xl font-bold text-white mb-1">{p.title}</h3>
                                  <div className="text-xl md:text-2xl font-mono text-yellow-500 mb-4">Rp {p.price.toLocaleString('id-ID')}</div>
                                  <div className="flex gap-4 text-xs text-gray-400 mb-6"><span className="uppercase tracking-widest">{p.duration} Days</span>{p.is_limited && <span className="text-red-500 font-bold">Stock: {p.stock}</span>}</div>
-                                 <div className="space-y-2 mb-6 flex-1">{(p.description || "").split(',').map((f, i) => <div key={i} className="text-sm text-gray-300 flex items-center gap-2"><div className="w-1 h-1 bg-green-500 rounded-full"></div>{f.trim()}</div>)}</div>
-                                 
-                                 <button 
-                                     onClick={() => handleTogglePackageStatus(p)} 
-                                     className={`w-full py-2 rounded border text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2 ${isActive ? 'bg-white/5 border-white/5 text-gray-500 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900' : 'bg-red-900/20 border-red-800 text-red-400 hover:bg-green-900/20 hover:text-green-400 hover:border-green-800'}`}
-                                 >
-                                    {isActive ? <><Icons.EyeOff /> Disable</> : <><Icons.Eye /> Enable</>}
-                                 </button>
+                                 <button onClick={() => handleTogglePackageStatus(p)} className={`w-full py-2 rounded border text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2 ${isActive ? 'bg-white/5 border-white/5 text-gray-500 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900' : 'bg-red-900/20 border-red-800 text-red-400 hover:bg-green-900/20 hover:text-green-400 hover:border-green-800'}`}>{isActive ? <><Icons.EyeOff /> Disable</> : <><Icons.Eye /> Enable</>}</button>
                             </div>
                         );
                     })}
@@ -553,7 +503,28 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* --- MODAL BULK IMPORT --- */}
+      {/* --- APPROVE MODAL (NEW) --- */}
+      {showApproveModal && editingUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative">
+                <button onClick={() => setShowApproveModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-xl font-bold text-white mb-2">Approve User</h3>
+                <p className="text-sm text-gray-400 mb-6">User: <span className="text-white font-mono">{editingUser.email}</span></p>
+                {editingUser.last_order_info && (
+                    <div className="bg-yellow-900/20 border border-yellow-900/50 p-3 rounded mb-4 text-sm text-yellow-200">
+                        <strong>Order Note:</strong><br/>{editingUser.last_order_info}
+                    </div>
+                )}
+                <div>
+                    <label className="text-xs text-gray-500 uppercase">Set Duration (Days)</label>
+                    <input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-green-500 outline-none mt-1" />
+                </div>
+                <button onClick={handleConfirmApprove} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded mt-6">CONFIRM & ACTIVATE</button>
+            </div>
+        </div>
+      )}
+
+      {/* --- BULK IMPORT MODAL --- */}
       {showBulkModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="bg-[#111] border border-gray-800 w-full max-w-lg rounded-2xl p-6 relative">
@@ -568,11 +539,50 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODALS SAMA SEPERTI SEBELUMNYA */}
-      {showUserModal && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative"><button onClick={() => setShowUserModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button><h3 className="text-xl font-bold text-white mb-6">New Access</h3><form onSubmit={handleCreateUser} className="space-y-4"><div><label className="text-xs text-gray-500 uppercase">Email</label><input type="email" value={userFormEmail} onChange={e => setUserFormEmail(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required /></div><div><label className="text-xs text-gray-500 uppercase">Duration (Days)</label><input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required /></div><button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-2">Generate</button></form></div></div>)}
-      {showEditUserModal && editingUser && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative"><button onClick={() => setShowEditUserModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button><h3 className="text-xl font-bold text-white mb-6">Edit / Reactivate User</h3><form onSubmit={handleUpdateUser} className="space-y-4"><div><label className="text-xs text-gray-500 uppercase">Email</label><input type="email" value={userFormEmail} onChange={e => setUserFormEmail(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required /></div><div><label className="text-xs text-gray-500 uppercase">Add Days / Reactivate</label><input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" placeholder="Enter days to reactivate" /><p className="text-[10px] text-gray-500 mt-1">Mengisi kolom ini akan me-reset masa aktif mulai dari <strong>HARI INI</strong>.</p></div><button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-2">Update / Reactivate</button></form></div></div>)}
+      {/* --- CREATE USER MODAL --- */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative">
+                <button onClick={() => setShowUserModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-xl font-bold text-white mb-6">New Access</h3>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Email</label>
+                        <input type="email" value={userFormEmail} onChange={e => setUserFormEmail(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Duration (Days)</label>
+                        <input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required />
+                    </div>
+                    <button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-2">Generate</button>
+                </form>
+            </div>
+        </div>
+      )}
 
-      {/* --- PACKAGE MODAL (UPDATED FOR IMAGE) --- */}
+      {/* --- EDIT USER MODAL --- */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative">
+                <button onClick={() => setShowEditUserModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-xl font-bold text-white mb-6">Edit / Reactivate User</h3>
+                <form onSubmit={handleUpdateUser} className="space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Email</label>
+                        <input type="email" value={userFormEmail} onChange={e => setUserFormEmail(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Add Days / Reactivate</label>
+                        <input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" placeholder="Enter days to reactivate" />
+                        <p className="text-[10px] text-gray-500 mt-1">Mengisi kolom ini akan me-reset masa aktif mulai dari <strong>HARI INI</strong>.</p>
+                    </div>
+                    <button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-2">Update / Reactivate</button>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* --- PACKAGE MODAL --- */}
       {showPackageModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
               <div className="bg-[#111] border border-gray-800 w-full max-w-md rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -595,9 +605,98 @@ export default function AdminPage() {
           </div>
       )}
       
-      {/* Schedule & Media Modal Tetap Sama */}
-      {showScheduleModal && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#111] border border-gray-800 w-full max-w-lg rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar"><button onClick={() => setShowScheduleModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button><h3 className="text-xl font-bold text-white mb-6">New Stream</h3><form onSubmit={handleCreateSchedule} className="space-y-4"><div><label className="text-xs text-gray-500 uppercase">Title</label><input type="text" value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required /></div><div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-gray-500 uppercase">Time</label><input type="datetime-local" value={newScheduleTime} onChange={e => setNewScheduleTime(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white outline-none" required /></div><div><label className="text-xs text-gray-500 uppercase">Price</label><input type="number" value={newSchedulePrice} onChange={e => setNewSchedulePrice(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white outline-none" /></div></div><div><label className="text-xs text-gray-500 uppercase">Thumbnail</label><div className="flex gap-2"><input type="text" value={newScheduleThumbnail} onChange={e => setNewScheduleThumbnail(e.target.value)} className="flex-1 bg-black border-gray-700 rounded p-3 text-white text-xs outline-none" /><button type="button" onClick={() => {setMediaMode('schedule'); setShowMediaModal(true); fetchMedia();}} className="bg-gray-800 text-white px-4 rounded border border-gray-600"><Icons.Image /></button></div></div><div className="bg-white/5 p-4 rounded-lg border border-gray-700/50 mt-2"><label className="block text-xs text-gray-400 mb-3 uppercase font-bold">Source Type</label><div className="flex flex-wrap gap-4 mb-4"><label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'internal'} onChange={() => setStreamSource('internal')} className="accent-yellow-500" /><span className="text-sm">Internal</span></label><label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'external'} onChange={() => setStreamSource('external')} className="accent-yellow-500" /><span className="text-sm">External</span></label><label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'youtube'} onChange={() => setStreamSource('youtube')} className="accent-yellow-500" /><span className="text-sm">YouTube</span></label></div>{streamSource === 'internal' && (<input type="text" value="TUTUP SEMENTARA" readOnly disabled className="w-full bg-red-950/20 border border-red-900/50 rounded p-3 text-red-500 font-bold text-center cursor-not-allowed outline-none" />)}{streamSource === 'youtube' && (<input type="text" value={newScheduleUrl} onChange={e => setNewScheduleUrl(e.target.value)} className="w-full bg-black border-green-900/50 rounded p-3 text-white outline-none" placeholder="Paste YouTube Link Here..." />)}{streamSource === 'external' && (<div className="space-y-3"><input type="text" value={newScheduleUrl} onChange={e => setNewScheduleUrl(e.target.value)} className="w-full bg-black border-blue-900/50 rounded p-3 text-white outline-none" placeholder="Paste Link IDN / M3U8 Here..." /><p className="text-xs text-gray-500 pt-2 border-t border-gray-800">Additional Resolutions (Optional)</p><div className="flex gap-2"><input type="text" placeholder="Label (e.g. 1080p)" value={tempLabel} onChange={e => setTempLabel(e.target.value)} className="w-24 bg-black border border-gray-700 rounded p-2 text-xs text-white" /><input type="text" placeholder="M3U8 URL" value={tempUrl} onChange={e => setTempUrl(e.target.value)} className="flex-1 bg-black border border-gray-700 rounded p-2 text-xs text-white" /><button type="button" onClick={addQuality} className="bg-yellow-600 text-black px-3 rounded font-bold text-xs hover:bg-yellow-500">ADD</button></div><div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">{qualities.map((q, idx) => (<div key={idx} className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800"><div className="text-xs overflow-hidden"><span className="font-bold text-yellow-500 mr-2">[{q.label}]</span><span className="text-gray-400 truncate">{q.url.substring(0, 25)}...</span></div><button type="button" onClick={() => removeQuality(idx)} className="text-red-500 hover:text-white"><Icons.X /></button></div>))}</div></div>)}</div><button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-4">Create Stream</button></form></div></div>)}
-      {showMediaModal && (<div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"><div className="bg-[#111] border border-gray-800 w-full max-w-3xl rounded-2xl p-6 relative h-[80vh] flex flex-col"><div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-4"><h3 className="text-xl font-bold text-white">Media</h3><button onClick={() => setShowMediaModal(false)}><Icons.X /></button></div><div className="mb-6 p-6 border-2 border-dashed border-gray-800 rounded-xl text-center relative bg-black/50"><input type="file" accept="image/*" onChange={handleUploadMedia} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" /><div className="pointer-events-none">{uploading ? <p className="text-yellow-500 animate-pulse">Uploading...</p> : <><div className="flex justify-center mb-2 text-gray-500"><Icons.Upload /></div><p className="text-sm text-gray-400">Upload Image</p></>}</div></div><div className="flex-1 overflow-y-auto custom-scrollbar"><div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">{mediaFiles.map((file, idx) => (<div key={idx} onClick={() => handleSelectMedia(file.url)} className="aspect-square bg-gray-900 rounded overflow-hidden border border-gray-800 hover:border-yellow-500 cursor-pointer group relative"><img src={file.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform" /><div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center"><span className="text-xs text-white font-bold">SELECT</span></div></div>))}</div></div></div></div>)}
+      {/* --- SCHEDULE MODAL --- */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111] border border-gray-800 w-full max-w-lg rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <button onClick={() => setShowScheduleModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-xl font-bold text-white mb-6">New Stream</h3>
+                <form onSubmit={handleCreateSchedule} className="space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Title</label>
+                        <input type="text" value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white focus:border-yellow-500 outline-none" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase">Time</label>
+                            <input type="datetime-local" value={newScheduleTime} onChange={e => setNewScheduleTime(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white outline-none" required />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase">Price</label>
+                            <input type="number" value={newSchedulePrice} onChange={e => setNewSchedulePrice(e.target.value)} className="w-full bg-black border-gray-700 rounded p-3 text-white outline-none" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase">Thumbnail</label>
+                        <div className="flex gap-2">
+                            <input type="text" value={newScheduleThumbnail} onChange={e => setNewScheduleThumbnail(e.target.value)} className="flex-1 bg-black border-gray-700 rounded p-3 text-white text-xs outline-none" />
+                            <button type="button" onClick={() => {setMediaMode('schedule'); setShowMediaModal(true); fetchMedia();}} className="bg-gray-800 text-white px-4 rounded border border-gray-600"><Icons.Image /></button>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 p-4 rounded-lg border border-gray-700/50 mt-2">
+                        <label className="block text-xs text-gray-400 mb-3 uppercase font-bold">Source Type</label>
+                        <div className="flex flex-wrap gap-4 mb-4">
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'internal'} onChange={() => setStreamSource('internal')} className="accent-yellow-500" /><span className="text-sm">Internal</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'external'} onChange={() => setStreamSource('external')} className="accent-yellow-500" /><span className="text-sm">External</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="source" checked={streamSource === 'youtube'} onChange={() => setStreamSource('youtube')} className="accent-yellow-500" /><span className="text-sm">YouTube</span></label>
+                        </div>
+                        {streamSource === 'internal' && (<input type="text" value="TUTUP SEMENTARA" readOnly disabled className="w-full bg-red-950/20 border border-red-900/50 rounded p-3 text-red-500 font-bold text-center cursor-not-allowed outline-none" />)}
+                        {streamSource === 'youtube' && (<input type="text" value={newScheduleUrl} onChange={e => setNewScheduleUrl(e.target.value)} className="w-full bg-black border-green-900/50 rounded p-3 text-white outline-none" placeholder="Paste YouTube Link Here..." />)}
+                        {streamSource === 'external' && (
+                            <div className="space-y-3">
+                                <input type="text" value={newScheduleUrl} onChange={e => setNewScheduleUrl(e.target.value)} className="w-full bg-black border-blue-900/50 rounded p-3 text-white outline-none" placeholder="Paste Link IDN / M3U8 Here..." />
+                                <p className="text-xs text-gray-500 pt-2 border-t border-gray-800">Additional Resolutions (Optional)</p>
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="Label (e.g. 1080p)" value={tempLabel} onChange={e => setTempLabel(e.target.value)} className="w-24 bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+                                    <input type="text" placeholder="M3U8 URL" value={tempUrl} onChange={e => setTempUrl(e.target.value)} className="flex-1 bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+                                    <button type="button" onClick={addQuality} className="bg-yellow-600 text-black px-3 rounded font-bold text-xs hover:bg-yellow-500">ADD</button>
+                                </div>
+                                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                                    {qualities.map((q, idx) => (
+                                        <div key={idx} className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                                            <div className="text-xs overflow-hidden"><span className="font-bold text-yellow-500 mr-2">[{q.label}]</span><span className="text-gray-400 truncate">{q.url.substring(0, 25)}...</span></div>
+                                            <button type="button" onClick={() => removeQuality(idx)} className="text-red-500 hover:text-white"><Icons.X /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <button type="submit" className="w-full bg-white text-black hover:bg-yellow-500 font-bold py-3 rounded mt-4">Create Stream</button>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* --- MEDIA MODAL --- */}
+      {showMediaModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <div className="bg-[#111] border border-gray-800 w-full max-w-3xl rounded-2xl p-6 relative h-[80vh] flex flex-col">
+                <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-4">
+                    <h3 className="text-xl font-bold text-white">Media</h3>
+                    <button onClick={() => setShowMediaModal(false)}><Icons.X /></button>
+                </div>
+                <div className="mb-6 p-6 border-2 border-dashed border-gray-800 rounded-xl text-center relative bg-black/50">
+                    <input type="file" accept="image/*" onChange={handleUploadMedia} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                    <div className="pointer-events-none">
+                        {uploading ? <p className="text-yellow-500 animate-pulse">Uploading...</p> : <><div className="flex justify-center mb-2 text-gray-500"><Icons.Upload /></div><p className="text-sm text-gray-400">Upload Image</p></>}
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                        {mediaFiles.map((file, idx) => (
+                            <div key={idx} onClick={() => handleSelectMedia(file.url)} className="aspect-square bg-gray-900 rounded overflow-hidden border border-gray-800 hover:border-yellow-500 cursor-pointer group relative">
+                                <img src={file.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                                    <span className="text-xs text-white font-bold">SELECT</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

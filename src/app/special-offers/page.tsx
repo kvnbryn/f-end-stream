@@ -35,6 +35,7 @@ export default function SpecialOffersPage() {
   // Modal State
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [userEmail, setUserEmail] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false); // New Loading State
 
   const backendUrl = getBackendUrl();
   const adminWa = '6288809048431';
@@ -55,11 +56,25 @@ export default function SpecialOffersPage() {
     fetchData();
   }, []);
 
-  const handleOrder = (e: React.FormEvent) => {
+  const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOffer || !userEmail) return;
 
-    const message = `Halo Admin Realtime48, saya ingin mengambil SPECIAL OFFER.
+    setIsProcessing(true);
+
+    try {
+        // 1. SAVE TO DATABASE (PENDING ORDER)
+        await fetch(`${backendUrl}/api/v1/public/order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: userEmail,
+                orderInfo: `${selectedOffer.title} (${selectedOffer.duration} Days) - Rp ${selectedOffer.price}`
+            })
+        });
+
+        // 2. OPEN WHATSAPP
+        const message = `Halo Admin Realtime48, saya ingin mengambil SPECIAL OFFER.
 
 Detail Pesanan:
 --------------------------------
@@ -70,10 +85,18 @@ Detail Pesanan:
 • Harga: Rp ${selectedOffer.price.toLocaleString('id-ID')}
 --------------------------------
 
-Mohon konfirmasi dan aktivasi.`;
+Data saya sudah masuk ke sistem (Pending). Mohon validasi dan aktivasi.`;
 
-    window.open(`https://wa.me/${adminWa}?text=${encodeURIComponent(message)}`, '_blank');
-    setSelectedOffer(null);
+        window.open(`https://wa.me/${adminWa}?text=${encodeURIComponent(message)}`, '_blank');
+        
+        // 3. CLOSE MODAL & RESET
+        setSelectedOffer(null);
+        setUserEmail('');
+    } catch (error) {
+        alert("Terjadi kesalahan koneksi. Silakan coba lagi.");
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -106,9 +129,8 @@ Mohon konfirmasi dan aktivasi.`;
              offers.map((offer) => (
                <div key={offer.id} className="group relative bg-[#0a0a0a] border border-gray-800 hover:border-yellow-600/50 rounded-2xl overflow-hidden flex flex-col transition-all duration-500 hover:shadow-[0_0_50px_rgba(234,179,8,0.1)]">
                   
-                  {/* Header Image Area (REVISED: h-80 = 320px) */}
+                  {/* Header Image Area */}
                   <div className="h-80 bg-gray-900 relative overflow-hidden">
-                     {/* LOGIC CUSTOM IMAGE VS DEFAULT */}
                      <img 
                         src={offer.image_url || "/logo.png"} 
                         className="w-full h-full object-cover opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 grayscale group-hover:grayscale-0" 
@@ -116,7 +138,6 @@ Mohon konfirmasi dan aktivasi.`;
                      />
                      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent"></div>
                      
-                     {/* Badge Limited */}
                      {offer.is_limited && (
                         <div className="absolute top-4 right-4 px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)] animate-pulse flex items-center gap-1">
                            <Icons.Zap /> Limited Stock: {offer.stock}
@@ -168,7 +189,7 @@ Mohon konfirmasi dan aktivasi.`;
       {selectedOffer && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
            <div className="w-full max-w-4xl bg-[#0a0a0a] border border-gray-800 rounded-3xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
-              <button onClick={() => setSelectedOffer(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white z-10"><Icons.X /></button>
+              <button onClick={() => !isProcessing && setSelectedOffer(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white z-10"><Icons.X /></button>
               
               {/* Kiri: QRIS */}
               <div className="w-full md:w-1/2 bg-white p-8 flex flex-col items-center justify-center text-black text-center relative overflow-hidden">
@@ -178,7 +199,6 @@ Mohon konfirmasi dan aktivasi.`;
                     <div className="w-64 h-64 bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-400">QRIS NOT AVAILABLE</div>
                  )}
                  <p className="mt-6 text-xs font-bold uppercase tracking-widest text-gray-500 relative z-10">Scan to Pay</p>
-                 
                  <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
               </div>
 
@@ -200,6 +220,7 @@ Mohon konfirmasi dan aktivasi.`;
                           className="w-full bg-[#111] border border-gray-800 rounded-lg p-4 text-white text-sm focus:border-yellow-500 outline-none transition-colors"
                           placeholder="name@example.com"
                           required
+                          disabled={isProcessing}
                        />
                     </div>
 
@@ -208,8 +229,8 @@ Mohon konfirmasi dan aktivasi.`;
                        <span className="text-xl font-mono text-yellow-500">Rp {selectedOffer.price.toLocaleString('id-ID')}</span>
                     </div>
 
-                    <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-all">
-                       <Icons.Whatsapp /> CONFIRM PAYMENT
+                    <button type="submit" disabled={isProcessing} className={`w-full text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-all ${isProcessing ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'}`}>
+                       {isProcessing ? 'Processing Order...' : <><Icons.Whatsapp /> CONFIRM PAYMENT</>}
                     </button>
                     <p className="text-[10px] text-gray-600 text-center">Admin will verify your payment manually.</p>
                  </form>
