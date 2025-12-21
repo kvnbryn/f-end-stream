@@ -247,6 +247,13 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
+  // --- HELPERS (INI YANG KEMAREN ILANG) ---
+  const isUserExpired = (user: User) => {
+      if (user.status === 'PENDING') return false;
+      if (!user.Subscription) return true;
+      return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
+  };
+
   // --- ACTIONS ---
   const handleSelectUser = (id: string) => {
       const newSet = new Set(selectedUserIds);
