@@ -124,6 +124,7 @@ export default function AdminPage() {
   const [userFormEmail, setUserFormEmail] = useState('');
   const [userFormDuration, setUserFormDuration] = useState(30);
   const [bulkText, setBulkText] = useState('');
+  const [bulkDuration, setBulkDuration] = useState(30); // STATE BARU UTK DURASI BULK
   const [bulkLoading, setBulkLoading] = useState(false);
   
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
@@ -166,13 +167,12 @@ export default function AdminPage() {
     if (!token) return;
     setIsLoadingUsers(true);
     try {
-        // Param Query Sakti
         const params = new URLSearchParams({
             page: page.toString(),
             limit: '20',
             search: debouncedSearch,
             status: userFilter,
-            _t: new Date().getTime().toString() // ANTI-CACHE
+            _t: new Date().getTime().toString()
         });
 
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
@@ -184,16 +184,14 @@ export default function AdminPage() {
         
         if (res.ok) {
             if (Array.isArray(data)) {
-                 // --- SAFETY MODE (BACKEND LAMA) ---
-                 // Kita potong datanya cuma 50 biar browser lu gak meledak!
-                 console.error("CRITICAL: BACKEND VERSI LAMA TERDETEKSI. Mengaktifkan Safe Mode.");
-                 const safeData = data.slice(0, 50); // Cuma ambil 50
+                 // --- SAFETY MODE ---
+                 const safeData = data.slice(0, 50); 
                  setUsers(safeData);
                  setTotalPages(1);
                  setTotalUsers(data.length);
                  showToast('Mode Lambat: Backend belum update! Hanya menampilkan 50 user.', 'error');
             } else if (data.data && data.meta) {
-                 // --- OPTIMIZED MODE (BACKEND BARU) ---
+                 // --- OPTIMIZED MODE ---
                  setUsers(data.data);
                  setTotalPages(data.meta.totalPages);
                  setTotalUsers(data.meta.total);
@@ -210,7 +208,7 @@ export default function AdminPage() {
     }
   }, [token, page, debouncedSearch, userFilter, backendUrl]);
 
-  // --- FETCH GLOBAL DATA (Schedule/Package) ---
+  // --- FETCH GLOBAL DATA ---
   const fetchGlobalData = async () => {
      if (!token) return;
      try {
@@ -249,13 +247,6 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
-  // --- HELPERS ---
-  const isUserExpired = (user: User) => {
-      if (user.status === 'PENDING') return false;
-      if (!user.Subscription) return true;
-      return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
-  };
-
   // --- ACTIONS ---
   const handleSelectUser = (id: string) => {
       const newSet = new Set(selectedUserIds);
@@ -279,7 +270,7 @@ export default function AdminPage() {
           });
           showToast('Users Deleted', 'success');
           setSelectedUserIds(new Set());
-          fetchUsers(); // Refresh Grid
+          fetchUsers(); 
       } catch (e) { showToast('Gagal hapus massal', 'error'); }
   };
 
@@ -308,9 +299,34 @@ export default function AdminPage() {
   const handleUpdateUser = async (e: React.FormEvent) => { e.preventDefault(); if(!editingUser) return; await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined }) }); showToast('Updated / Reactivated!', 'success'); setShowEditUserModal(false); fetchUsers(); };
   const handleDeleteUser = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
   const handleResetDevice = async (id: string) => { if(!confirm('Reset?')) return; await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchUsers(); };
-  const handleBulkImport = async (e: React.FormEvent) => { e.preventDefault(); setBulkLoading(true); try { const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: bulkText }) }); const data = await res.json(); showToast(data.message, 'success'); setBulkText(''); setShowBulkModal(false); fetchUsers(); } catch (e) { showToast('Import gagal', 'error'); } finally { setBulkLoading(false); } };
+  
+  // BULK IMPORT - DENGAN DURASI
+  const handleBulkImport = async (e: React.FormEvent) => { 
+      e.preventDefault(); 
+      setBulkLoading(true); 
+      try { 
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, { 
+              method: 'POST', 
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ 
+                  rawText: bulkText,
+                  durationDays: Number(bulkDuration) // KIRIM DURASI
+              }) 
+          }); 
+          const data = await res.json(); 
+          showToast(data.message, 'success'); 
+          setBulkText(''); 
+          setBulkDuration(30); // Reset ke default
+          setShowBulkModal(false); 
+          fetchUsers(); 
+      } catch (e) { 
+          showToast('Import gagal', 'error'); 
+      } finally { 
+          setBulkLoading(false); 
+      } 
+  };
 
-  // CRUD Schedule (sama seperti dulu, panggil fetchGlobalData)
+  // CRUD Schedule
   const handleCreateSchedule = async (e: React.FormEvent) => { e.preventDefault(); await fetch(`${backendUrl}/api/v1/admin/schedules`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newScheduleTitle, start_time: new Date(newScheduleTime).toISOString(), thumbnail: newScheduleThumbnail, price: Number(newSchedulePrice), stream_source: streamSource, stream_key: streamSource === 'internal' ? 'DISABLED' : undefined, custom_url: (streamSource === 'external' || streamSource === 'youtube') ? newScheduleUrl : undefined, qualities: streamSource === 'external' ? qualities : [] }) }); showToast('Created!', 'success'); setShowScheduleModal(false); setQualities([]); fetchGlobalData(); };
   const handleActivateSchedule = async (schedule: Schedule) => { const action = schedule.is_active ? 'stop' : 'activate'; await fetch(`${backendUrl}/api/v1/admin/schedules/${schedule.id}/${action}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); fetchGlobalData(); };
   const handleDeleteSchedule = async (id: string) => { if(!confirm('Del?')) return; await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); fetchGlobalData(); };
@@ -597,14 +613,29 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* --- BULK IMPORT MODAL --- */}
+      {/* --- BULK IMPORT MODAL - DENGAN DURASI CUSTOM --- */}
       {showBulkModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="bg-[#111] border border-gray-800 w-full max-w-lg rounded-2xl p-6 relative">
                 <button onClick={() => setShowBulkModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><Icons.X /></button>
                 <h3 className="text-xl font-bold text-white mb-2">Bulk Import Users</h3>
-                <p className="text-xs text-gray-500 mb-4">Paste email list here (one per line or comma separated). Each user will get <strong>30 Days</strong> access.</p>
+                <p className="text-xs text-gray-500 mb-4">Paste email list here (one per line or comma separated).</p>
+                
                 <form onSubmit={handleBulkImport}>
+                    {/* INPUT DURASI BARU */}
+                    <div className="mb-4">
+                        <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Duration (Days)</label>
+                        <input 
+                            type="number" 
+                            value={bulkDuration} 
+                            onChange={(e) => setBulkDuration(Number(e.target.value))} 
+                            className="w-full bg-black border border-gray-700 rounded p-3 text-white text-sm focus:border-yellow-500 outline-none" 
+                            placeholder="Enter duration (e.g. 30)"
+                            required
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Default: 30 Days</p>
+                    </div>
+
                     <textarea className="w-full h-48 bg-black border border-gray-700 rounded p-3 text-white text-xs font-mono outline-none focus:border-yellow-500" placeholder="user1@email.com&#10;user2@email.com" value={bulkText} onChange={(e) => setBulkText(e.target.value)} required />
                     <div className="mt-4 flex justify-end"><button type="submit" disabled={bulkLoading} className="bg-white text-black hover:bg-yellow-500 font-bold px-6 py-3 rounded disabled:opacity-50 transition-colors">{bulkLoading ? 'Processing...' : 'Start Import'}</button></div>
                 </form>
