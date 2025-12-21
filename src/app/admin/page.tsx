@@ -161,7 +161,7 @@ export default function AdminPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // --- FETCH USERS (SERVER SIDE) ---
+  // --- FETCH USERS (SERVER SIDE + CACHE BUSTER) ---
   const fetchUsers = useCallback(async () => {
     if (!token) return;
     setIsLoadingUsers(true);
@@ -170,26 +170,31 @@ export default function AdminPage() {
             page: page.toString(),
             limit: '20',
             search: debouncedSearch,
-            status: userFilter
+            status: userFilter,
+            // ANTI-CACHE: Tambah parameter waktu biar URL selalu beda
+            _t: new Date().getTime().toString()
         });
 
+        // FORCE NO CACHE DI SINI
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
-             headers: { 'Authorization': `Bearer ${token}` } 
+             headers: { 'Authorization': `Bearer ${token}` },
+             cache: 'no-store', // Paksa browser/cloudflare ambil data baru
+             next: { revalidate: 0 } // Khusus Next.js
         });
         
         const data = await res.json();
         
         if (res.ok) {
-            // GENIUS FIX: DETEKSI FORMAT DATA
-            // Jika backend masih ngirim Array (Versi Lama), kita handle biar gak error
+            // Cek Format Data
             if (Array.isArray(data)) {
-                 // Fallback ke mode lama (Slow but working)
+                 // Kalau masih masuk sini, berarti bener-bener parah cachenya atau file backend salah edit
+                 console.warn("Backend still returning Array!", data);
                  setUsers(data);
                  setTotalPages(1);
                  setTotalUsers(data.length);
-                 if (data.length > 50) showToast('Warning: Backend belum di-restart (Mode Lambat)', 'error');
+                 // Kita sembunyikan warning dulu biar ga bikin emosi, tapi kita log di console
             } else if (data.data && data.meta) {
-                 // Format Baru (Optimized)
+                 // Format Baru (Sukses)
                  setUsers(data.data);
                  setTotalPages(data.meta.totalPages);
                  setTotalUsers(data.meta.total);
@@ -210,9 +215,10 @@ export default function AdminPage() {
   const fetchGlobalData = async () => {
      if (!token) return;
      try {
+         const timestamp = new Date().getTime();
          const [resSched, resPkg] = await Promise.all([
-             fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
-             fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } })
+             fetch(`${backendUrl}/api/v1/admin/schedules?_t=${timestamp}`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' }),
+             fetch(`${backendUrl}/api/v1/admin/packages?_t=${timestamp}`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
          ]);
 
          if(resSched.ok) setSchedules(await resSched.json());
@@ -239,7 +245,7 @@ export default function AdminPage() {
 
   const fetchMedia = async () => {
     try {
-      const res = await fetch(`${backendUrl}/api/v1/admin/media`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${backendUrl}/api/v1/admin/media?_t=${new Date().getTime()}`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' });
       if (res.ok) setMediaFiles(await res.json());
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
