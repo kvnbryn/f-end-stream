@@ -17,10 +17,11 @@ type User = {
     id: string; 
     email: string; 
     role: string; 
-    status: string; // 'ACTIVE' | 'PENDING'
+    status: string; 
     last_order_info: string | null;
     registered_device_id: string | null; 
     Subscription: Subscription | null; 
+    created_at?: string;
 };
 
 type Quality = { label: string; url: string }; 
@@ -156,9 +157,8 @@ export default function AdminPage() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // --- GENIUS OPTIMIZATION: DATA FETCHERS ---
+  // --- GENIUS OPTIMIZATION: DATA FETCHERS (NO-CACHE FORCED) ---
   
-  // Fetch Users (Optimized with Server-Side Filter)
   const fetchUsers = async () => {
     if (!token) return;
     try {
@@ -166,20 +166,23 @@ export default function AdminPage() {
         if (userFilter !== 'ALL') params.append('filter', userFilter);
         if (debouncedSearch) params.append('search', debouncedSearch);
 
-        // Hanya fetch user yang dibutuhkan
+        // NOTE: Kita paksa request baru setiap kali (no-cache) agar filter real-time
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Prisma': 'no-cache'
+            },
+            cache: 'no-store' 
         });
         
         if (res.ok) {
             setUsers(await res.json());
-            // Reset selection kalo filter berubah biar aman
             setSelectedUserIds(new Set()); 
         }
     } catch (e) { console.error(e); }
   };
 
-  // Fetch Other Data (Schedule & Packages)
   const fetchOtherData = async () => {
      if (!token) return;
      try {
@@ -203,7 +206,6 @@ export default function AdminPage() {
   useEffect(() => { 
       if (!isLoading && token) { 
           fetchOtherData();
-          // Kita panggil fetchUsers juga di awal
           fetchUsers();
       } 
       if (!isLoading && !token) router.push('/login'); 
@@ -223,8 +225,7 @@ export default function AdminPage() {
     } catch (err) { showToast('Gagal load media', 'error'); }
   };
 
-  // --- HELPERS ---
-  // Kita tetap butuh helper ini untuk visual styling, tapi filtering logic udah dihapus
+  // --- HELPER VISUAL ---
   const isUserExpired = (user: User) => {
       if (user.status === 'PENDING') return false;
       if (!user.Subscription) return true;
