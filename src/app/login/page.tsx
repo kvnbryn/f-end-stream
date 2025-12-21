@@ -45,7 +45,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   
-  const { login, token, isLoading } = useAuth();
+  // Ambil deviceId dari context untuk dikirim ke backend
+  const { login, token, isLoading, deviceId } = useAuth();
   const router = useRouter();
   const backendUrl = getBackendUrl();
 
@@ -55,14 +56,35 @@ export default function LoginPage() {
     }
   }, [token, isLoading, router]);
 
+  const performLogin = async (emailInput: string) => {
+    // 1. Hit API Backend manual di sini
+    const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            email: emailInput, 
+            deviceId: deviceId // Kirim Device ID dari context
+        })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(data.message || 'Login failed');
+    }
+
+    // 2. Kalau sukses, baru panggil login() context dengan 2 argumen
+    login(data.token, data.role);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setDeviceLockError(false); // Reset lock state
+    setDeviceLockError(false);
     setLoading(true);
     
     try {
-      await login(email);
+      await performLogin(email);
     } catch (err: any) {
       const msg = err.message || 'Login failed';
       setError(msg);
@@ -91,8 +113,8 @@ export default function LoginPage() {
               alert(`Sukses: ${data.message}\nSisa Reset: ${data.remaining}`);
               setDeviceLockError(false);
               setError('');
-              // Otomatis coba login lagi setelah reset sukses (opsional, tapi UX bagus)
-              login(email);
+              // Otomatis coba login lagi setelah reset sukses
+              await performLogin(email);
           } else {
               alert(`Gagal: ${data.message}`);
           }
