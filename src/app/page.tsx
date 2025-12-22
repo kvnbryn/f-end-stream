@@ -33,13 +33,13 @@ export default function HomePage() {
   
   // UI States
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState(''); // NEW: Pesan sukses reset
+  const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Reset Device States
   const [showWaLink, setShowWaLink] = useState(false);
-  const [showResetButton, setShowResetButton] = useState(false); // NEW: Tombol Reset
-  const [isResetting, setIsResetting] = useState(false); // NEW: Loading Reset
+  const [showResetButton, setShowResetButton] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   
   // Modal States
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -66,7 +66,7 @@ export default function HomePage() {
         .then(data => { if (Array.isArray(data)) setSchedules(data); })
         .catch(err => console.error(err));
     }
-  }, [viewMode]);
+  }, [viewMode, schedules.length, backendUrl]);
 
   // 3. Login Handler
   const handleLogin = async (e: React.FormEvent) => {
@@ -111,7 +111,7 @@ export default function HomePage() {
     }
   };
 
-  // 4. Handle Self Reset (NEW)
+  // 4. Handle Self Reset
   const handleSelfReset = async () => {
     if(!email) return;
     setIsResetting(true);
@@ -128,7 +128,7 @@ export default function HomePage() {
         if(!res.ok) throw new Error(data.message);
 
         // Jika Sukses
-        setSuccessMsg(`Berhasil! ${data.message} (Sisa: ${data.remaining}x)`);
+        setSuccessMsg(`Berhasil! Silakan klik tombol ENTER SPACE lagi.`);
         setShowResetButton(false);
         setShowWaLink(false);
 
@@ -215,33 +215,37 @@ Mohon informasinya untuk pembayaran & aktivasi. Terima kasih.`;
 
               {/* SUCCESS MESSAGE */}
               {successMsg && (
-                  <div className="mb-6 p-4 rounded border border-green-900/50 bg-green-900/10 text-green-400 text-sm animate-pulse">
-                      {successMsg}
+                  <div className="mb-6 bg-green-900/20 border border-green-800 p-3 rounded text-center">
+                      <p className="text-green-400 text-xs font-bold">{successMsg}</p>
                   </div>
               )}
 
-              {/* ERROR & RESET OPTIONS */}
+              {/* ERROR & RESET OPTIONS - SIMPLE & CLEAN */}
               {error && (
-                <div className="mb-6 p-4 rounded border border-red-900/50 bg-red-900/10 text-red-400 text-sm">
-                  <p className="font-semibold mb-1">Akses Ditolak</p>
-                  <p>{error}</p>
-                  
-                  {/* TOMBOL RESET DI SINI */}
-                  {showResetButton && (
-                      <button 
-                          onClick={handleSelfReset}
-                          disabled={isResetting}
-                          className="mt-3 w-full bg-red-800 hover:bg-red-700 text-white py-2 rounded text-xs font-bold uppercase transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                          {isResetting ? 'Processing...' : '⚠️ Reset My Device (Max 3x)'}
-                      </button>
-                  )}
-
-                  {showWaLink && (
-                      <a href={`https://wa.me/${adminWa}`} target="_blank" className="mt-3 block text-yellow-500 hover:underline text-xs text-center">
-                          {showResetButton ? "atau Hubungi Admin" : "→ Hubungi Admin untuk Reset Device"}
-                      </a>
-                  )}
+                <div className="mb-6">
+                   {showResetButton ? (
+                       // TAMPILAN RESET ACTION CARD
+                       <div className="bg-[#111] border border-yellow-700/50 rounded-lg p-5 text-center">
+                           <h3 className="text-white font-bold text-sm mb-2">Login Ditolak</h3>
+                           <p className="text-gray-400 text-xs mb-5 leading-relaxed">
+                              Akun ini sedang aktif di perangkat lain.
+                           </p>
+                           
+                           <button 
+                               onClick={handleSelfReset} 
+                               disabled={isResetting}
+                               className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded text-xs uppercase tracking-wider transition-colors"
+                           >
+                               {isResetting ? 'Memproses...' : 'RESET & LOGIN DI SINI'}
+                           </button>
+                           <p className="text-[10px] text-gray-600 mt-2">Sisa reset: 3x sehari</p>
+                       </div>
+                   ) : (
+                       // TAMPILAN ERROR BIASA
+                       <div className="bg-red-900/10 border border-red-900/30 p-3 rounded text-center">
+                           <p className="text-red-500 text-xs">{error}</p>
+                       </div>
+                   )}
                 </div>
               )}
 
@@ -250,8 +254,21 @@ Mohon informasinya untuk pembayaran & aktivasi. Terima kasih.`;
                   <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="peer w-full bg-transparent border-b border-gray-700 py-3 text-lg text-white focus:border-yellow-500 focus:outline-none transition-colors placeholder-transparent" id="emailInput" placeholder="Email" />
                   <label htmlFor="emailInput" className="absolute left-0 -top-3.5 text-sm text-gray-500 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-lg peer-placeholder-shown:text-gray-500 peer-focus:-top-3.5 peer-focus:text-sm peer-focus:text-yellow-500">Email Address</label>
                 </div>
-                <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black hover:bg-yellow-500 hover:text-black font-bold py-4 rounded transition-all duration-300 disabled:opacity-50">{isSubmitting ? 'Processing...' : 'ENTER SPACE'}</button>
+                
+                {/* HIDE BUTTON SAAT RESET MODE AKTIF */}
+                {!showResetButton && (
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black hover:bg-yellow-500 hover:text-black font-bold py-4 rounded transition-all duration-300 disabled:opacity-50 text-sm tracking-widest">{isSubmitting ? 'Processing...' : 'ENTER SPACE'}</button>
+                )}
               </form>
+              
+              {/* WA LINK FALLBACK */}
+              {showWaLink && (
+                  <div className="mt-6 text-center pt-4 border-t border-white/5">
+                      <a href={`https://wa.me/${adminWa}`} target="_blank" className="text-gray-500 hover:text-white text-xs underline">
+                          Bantuan Admin (WhatsApp)
+                      </a>
+                  </div>
+              )}
 
               <div className="mt-12 pt-8 border-t border-white/5 text-center">
                 <p className="text-gray-500 text-sm mb-4">Belum punya akses?</p>
