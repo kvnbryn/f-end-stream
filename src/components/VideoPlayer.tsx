@@ -30,9 +30,11 @@ export default function VideoPlayer({
 
   useEffect(() => {
     if (!playerRef.current) {
+      // Create Element Video secara manual agar kompatibel dengan React Strict Mode
       const videoElement = document.createElement("video-js");
       videoElement.classList.add('vjs-big-play-centered', 'vjs-theme-forest'); 
       
+      // Append ke container ref
       videoRef.current?.appendChild(videoElement);
 
       // KONFIGURASI MAGIC: YouTube dalam Skin Video.js
@@ -64,11 +66,17 @@ export default function VideoPlayer({
         if (startTime) player.currentTime(startTime);
       });
 
+      // FIX ERROR TYPESCRIPT DI SINI
       player.on('timeupdate', () => {
-        if (onTimeUpdate) onTimeUpdate(player.currentTime());
+        const currentTime = player.currentTime();
+        // Kita pastikan kalau hasilnya number baru dikirim, kalau undefined kasih 0
+        if (onTimeUpdate) {
+            onTimeUpdate(typeof currentTime === 'number' ? currentTime : 0);
+        }
       });
 
     } else {
+      // Update Player jika props berubah
       const player = playerRef.current;
       player.autoplay(options.autoplay);
       player.src(options.sources);
@@ -76,6 +84,7 @@ export default function VideoPlayer({
     }
   }, [options, videoRef]);
 
+  // Cleanup saat unmount
   useEffect(() => {
     const player = playerRef.current;
     return () => {
