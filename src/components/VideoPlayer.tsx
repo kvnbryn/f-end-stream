@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
-import 'videojs-youtube'; // Plugin Wajib buat Skin YouTube
+import 'videojs-youtube'; 
 
 interface VideoPlayerProps {
   options: any;
@@ -27,36 +27,39 @@ export default function VideoPlayer({
   
   const videoRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Cek apakah ini mode YouTube
+  const isYoutube = options.sources[0]?.type === 'video/youtube';
 
   useEffect(() => {
     if (!playerRef.current) {
-      // Create Element Video secara manual agar kompatibel dengan React Strict Mode
       const videoElement = document.createElement("video-js");
-      videoElement.classList.add('vjs-big-play-centered', 'vjs-theme-forest'); 
+      videoElement.classList.add('vjs-big-play-centered', 'vjs-theme-forest');
       
-      // Append ke container ref
+      // HACK: Tambah class khusus biar bisa kita target CSS-nya
+      if(isYoutube) videoElement.classList.add('vjs-youtube-hack'); 
+      
       videoRef.current?.appendChild(videoElement);
 
-      // KONFIGURASI MAGIC: YouTube dalam Skin Video.js
       const finalOptions = {
         ...options,
-        // Pakai 'youtube' tech, baru html5
         techOrder: ['youtube', 'html5'], 
-        
-        // Settingan YouTube buat ngilangin branding (sebisa mungkin)
         youtube: {
-          ytControls: 0, // PENTING: Hide kontrol asli YT, ganti kontrol kita
-          modestbranding: 1, // Logo YT diminimalkan
-          rel: 0, // Jangan muncul video related dari channel lain
-          iv_load_policy: 3, // Hide anotasi
-          disablekb: 1, // Disable keyboard YT (biar handle pake player kita)
+          ytControls: 0, 
+          modestbranding: 1, 
+          rel: 0, 
+          iv_load_policy: 3, 
+          disablekb: 1, 
           customVars: { 
              wmode: 'transparent',
              playsinline: 1,
+             controls: 0,
+             showinfo: 0,
              origin: typeof window !== 'undefined' ? window.location.origin : '' 
           }
         },
-        controls: true,
+        controls: true, // Kita pake kontrol Video.js, bukan YouTube
         autoplay: true,
         preload: 'auto',
         fluid: true,
@@ -66,25 +69,25 @@ export default function VideoPlayer({
         if (startTime) player.currentTime(startTime);
       });
 
-      // FIX ERROR TYPESCRIPT DI SINI
       player.on('timeupdate', () => {
-        const currentTime = player.currentTime();
-        // Kita pastikan kalau hasilnya number baru dikirim, kalau undefined kasih 0
         if (onTimeUpdate) {
-            onTimeUpdate(typeof currentTime === 'number' ? currentTime : 0);
+            const time = player.currentTime();
+            onTimeUpdate(typeof time === 'number' ? time : 0);
         }
       });
 
+      player.on('play', () => setIsPlaying(true));
+      player.on('pause', () => setIsPlaying(false));
+
     } else {
-      // Update Player jika props berubah
       const player = playerRef.current;
       player.autoplay(options.autoplay);
       player.src(options.sources);
       if (poster) player.poster(poster);
     }
-  }, [options, videoRef]);
+  }, [options, videoRef, isYoutube]);
 
-  // Cleanup saat unmount
+  // Handle Destroy
   useEffect(() => {
     const player = playerRef.current;
     return () => {
@@ -95,19 +98,55 @@ export default function VideoPlayer({
     };
   }, [playerRef]);
 
+  // Handle Manual Play/Pause via Shield
+  const togglePlay = () => {
+      if(playerRef.current) {
+          if(playerRef.current.paused()) playerRef.current.play();
+          else playerRef.current.pause();
+      }
+  };
+
   return (
-    <div className="relative group">
-      {/* Container Video.js */}
+    <div className="relative group rounded-xl overflow-hidden shadow-2xl bg-black">
+      
+      {/* CSS INJECTION KHUSUS YOUTUBE 
+        Ini yang bikin videonya nge-zoom (Scale 1.25) biar logonya kepotong keluar.
+        pointer-events: none di iframe biar user gabisa klik 'Watch on YouTube'.
+      */}
+      {isYoutube && (
+        <style jsx global>{`
+          .vjs-youtube-hack .vjs-tech {
+            transform: scale(1.25); /* Zoom in 125% - Logo YouTube Kelempar Keluar */
+            transform-origin: center center;
+            pointer-events: none; /* Disable Klik langsung ke YouTube */
+          }
+          /* Fix Control Bar biar gak ikut ke-zoom/ilang */
+          .vjs-youtube-hack .vjs-control-bar {
+            z-index: 50; 
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+          }
+        `}</style>
+      )}
+
+      {/* CLICK SHIELD (Lapisan Bening) 
+          Ini buat nangkep klik user biar jadi Play/Pause, 
+          bukan malah ngeklik logo YouTube yg tembus.
+      */}
+      {isYoutube && (
+        <div 
+           onClick={togglePlay}
+           className="absolute inset-0 z-10 cursor-pointer"
+           style={{ bottom: '3em' }} // Sisain ruang buat control bar di bawah
+        />
+      )}
+
       <div data-vjs-player>
-        <div ref={videoRef} className="rounded-xl overflow-hidden shadow-2xl" />
+        <div ref={videoRef} className="w-full h-full" />
       </div>
 
-      {/* QUALITY SELECTOR 
-         Kalau YouTube, selector ini disembunyikan/di-disable 
-         karena YouTube atur resolusi 'Auto' sendiri.
-         Kecuali kalau pakai stream internal/m3u8 baru muncul.
-      */}
-      {qualities.length > 0 && options.sources[0].type !== 'video/youtube' && (
+      {/* Quality Selector (Cuma muncul kalo bukan YouTube) */}
+      {qualities.length > 0 && !isYoutube && (
           <div className="absolute top-4 right-4 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
              <div className="relative">
                  <select 
@@ -119,18 +158,15 @@ export default function VideoPlayer({
                         <option key={idx} value={q.val} className="bg-black text-white">{q.label}</option>
                     ))}
                  </select>
-                 <div className="absolute right-2 top-1.5 pointer-events-none text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                 </div>
              </div>
           </div>
       )}
       
-      {/* Indikator AUTO Resolution khusus YouTube (Opsional, buat gaya doang) */}
-      {options.sources[0].type === 'video/youtube' && (
+      {/* Label Clean Mode */}
+      {isYoutube && (
            <div className="absolute top-4 right-4 z-40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              <span className="bg-black/60 backdrop-blur text-white/70 text-[10px] px-2 py-1 rounded border border-white/10">
-                 AUTO HD
+              <span className="bg-black/60 backdrop-blur text-white/70 text-[10px] px-2 py-1 rounded border border-white/10 tracking-widest">
+                 HD CINEMA
               </span>
            </div>
       )}
