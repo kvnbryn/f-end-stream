@@ -11,17 +11,6 @@ if (typeof window !== 'undefined') {
   if (!videojs.getPlugin('qualityLevels')) require('videojs-contrib-quality-levels');
 }
 
-// --- CONSTANTS ---
-const YOUTUBE_QUALITY_MAP: { [key: string]: string } = {
-  '1080p': 'hd1080',
-  '720p': 'hd720',
-  '480p': 'large',
-  '360p': 'medium',
-  '240p': 'small',
-  'auto': 'default',
-  'source': 'highres',
-};
-
 // --- HELPER: CUSTOM MENU BUTTON ---
 const registerQualityMenu = () => {
   if (typeof window === 'undefined') return;
@@ -37,10 +26,7 @@ const registerQualityMenu = () => {
     }
 
     handleClick() {
-      const player = this.player();
       const targetValue = this.options_.value; 
-
-      // Visual Reset (Radio Button Logic)
       // @ts-ignore
       const menuParent = this.parentComponent_; 
       if (menuParent && menuParent.children_) {
@@ -50,57 +36,24 @@ const registerQualityMenu = () => {
       }
       this.selected(true);
 
-      const isYouTube = player.techName_ === 'Youtube';
-
-      // 1. LOGIKA YOUTUBE
-      if (isYouTube) {
-        const tech = player.tech(true);
-        const ytPlayer = tech.ytPlayer || (tech as any).ytPlayer_ || (player as any).ytPlayer;
-        if (ytPlayer && typeof ytPlayer.setPlaybackQuality === 'function') {
-          try { ytPlayer.setPlaybackQuality(YOUTUBE_QUALITY_MAP[targetValue] || 'default'); } catch (e) {}
-          if (this.options_.callback) this.options_.callback(targetValue, true);
-        }
-        return; 
-      }
-
-      // 2. LOGIKA HLS / PROXY IDN (AUTO DETECT)
       // @ts-ignore
-      const qualityLevels = player.qualityLevels ? player.qualityLevels() : null;
+      const qualityLevels = this.player().qualityLevels ? this.player().qualityLevels() : null;
 
+      // Logika HLS Native
       if (qualityLevels && qualityLevels.length > 0) {
-        console.log('[Player] Switching HLS Level to:', targetValue);
-
-        // Reset semua ke false (kecuali Auto)
         for (let i = 0; i < qualityLevels.length; i++) {
-          qualityLevels[i].enabled = targetValue === 'auto';
-        }
-
-        // Kalau pilih resolusi spesifik (bukan Auto)
-        if (targetValue !== 'auto') {
-          let foundIndex = -1;
-          for (let i = 0; i < qualityLevels.length; i++) {
-            // Cocokkan height (misal: 720) dengan targetValue (misal: "720p")
-            if ((qualityLevels[i].height + 'p') === targetValue) {
-              foundIndex = i;
-              break;
-            }
+          const lvl = qualityLevels[i];
+          if (targetValue === 'auto') {
+             lvl.enabled = true;
+          } else {
+             const label = lvl.height ? (lvl.height + 'p') : '';
+             lvl.enabled = (label === targetValue);
           }
-          if (foundIndex !== -1) qualityLevels[foundIndex].enabled = true;
         }
-
-        // Fitur "Seek to Live" (Anti-Freeze saat ganti kualitas)
-        if (!player.paused() && player.duration() === Infinity) {
-           setTimeout(() => {
-               const seekable = player.seekable();
-               if (seekable.length > 0) {
-                   player.currentTime(seekable.end(0) - 0.1);
-                   player.play().catch(() => {});
-               }
-           }, 100);
-        }
-
-        if (this.options_.callback) this.options_.callback(targetValue, true);
       }
+      
+      // Callback Keluar (Untuk YouTube / Manual Switch)
+      if (this.options_.callback) this.options_.callback(targetValue, true);
     }
   }
 
@@ -118,7 +71,7 @@ const registerQualityMenu = () => {
       el.innerHTML = `
         <div class="vjs-quality-icon-container">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-            <path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 00-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 00-2.282.819l-.922 1.597a1.875 1.875 0 00.432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 000 1.139c.016.2-.059.352-.153.43l-.841.692a1.875 1.875 0 00.432 2.385l.922 1.597a1.875 1.875 0 002.282.819l1.019-.393c.115-.044.283-.032.45.083a7.49 7.49 0 00.986.57c.182.088.277.228.297.348l.177 1.072c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.177-1.072c.02-.12.115-.26.297-.348.325-.157.639-.345.937-.562.166-.115.334-.126.45-.083l1.019.393a1.875 1.875 0 002.282-.819l.922-1.597a1.875 1.875 0 00-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 000-1.139c-.016-.2.059-.352.153-.43l.841-.692a1.875 1.875 0 00.432-2.385l-.922-1.597a1.875 1.875 0 00-2.282-.819l-1.019.393c-.115.044-.283.032-.45-.083-.298-.217-.612-.405-.937-.562-.182-.088-.277-.228-.297-.348l-.177-1.072c-.151-.904-.933-1.567-1.85-1.567h-1.844zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
+             <path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 00-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 00-2.282.819l-.922 1.597a1.875 1.875 0 00.432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 000 1.139c.016.2-.059.352-.153.43l-.841.692a1.875 1.875 0 00.432 2.385l.922 1.597a1.875 1.875 0 002.282.819l1.019-.393c.115-.044.283-.032.45.083a7.49 7.49 0 00.986.57c.182.088.277.228.297.348l.177 1.072c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.177-1.072c.02-.12.115-.26.297-.348.325-.157.639-.345.937-.562.166-.115.334-.126.45-.083l1.019.393a1.875 1.875 0 002.282-.819l.922-1.597a1.875 1.875 0 00-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 000-1.139c-.016-.2.059-.352.153-.43l.841-.692a1.875 1.875 0 00.432-2.385l-.922-1.597a1.875 1.875 0 00-2.282-.819l-1.019.393c-.115.044-.283.032-.45-.083-.298-.217-.612-.405-.937-.562-.182-.088-.277-.228-.297-.348l-.177-1.072c-.151-.904-.933-1.567-1.85-1.567h-1.844zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
           </svg>
         </div>
       `;
@@ -145,8 +98,6 @@ const registerQualityMenu = () => {
   videojs.registerComponent('QualityMenuButton', QualityMenuButton as any);
 };
 
-// --- COMPONENT INTERFACE ---
-// SAYA PERTAHANKAN 'qualities' AGAR TIDAK ERROR BUILD, TAPI LOGICNYA SAYA ABAIKAN UNTUK IDN
 interface VideoPlayerProps {
   options: {
     autoplay: boolean;
@@ -176,93 +127,92 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 }) => {
   const videoRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const currentSrcRef = useRef<string | null>(null);
+
   const [hasStarted, setHasStarted] = useState(startTime > 0);
   const [detectedLevels, setDetectedLevels] = useState<{ label: string; val: string }[]>([]);
 
+  // Deteksi Source
   const isYoutubeSource = options.sources?.[0]?.type === 'video/youtube';
-
-  // --- LOGIC PENENTUAN MENU KUALITAS ---
-  // 1. Jika Youtube -> Pakai List Statis
-  // 2. Jika IDN/HLS -> Pakai detectedLevels (Auto Detect dari Proxy)
-  // (Data 'qualities' dari props DIABAIKAN total untuk HLS demi konsistensi)
   
-  const ytQualities = [
-    { label: 'Auto', val: 'auto' },
-    { label: '1080p', val: '1080p' },
-    { label: '720p', val: '720p' },
-    { label: '480p', val: '480p' },
-    { label: '360p', val: '360p' },
-  ];
+  const finalOptions = {
+    ...options,
+    // KITA PAKSA TRUE AGAR PAKE CONTROLS BAWAAN VIDEOJS (BUKAN YOUTUBE)
+    controls: true, 
+    techOrder: ['html5', 'youtube'],
+    bigPlayButton: false, // Kita pake overlay start sendiri
+    html5: {
+      vhs: { overrideNative: true }, 
+      nativeAudioTracks: false,
+      nativeVideoTracks: false,
+    },
+    plugins: { qualityLevels: {} },
+    youtube: {
+      ytControls: 0, // MATIKAN KONTROL BAWAAN YOUTUBE
+      modestbranding: 1, // Minimal branding
+      iv_load_policy: 3, // Hilangkan anotasi
+      rel: 0,
+      playsinline: 1,
+      disablekb: 1, // Disable keyboard youtube (biar videojs yang handle)
+      ...options.youtube,
+    },
+  };
 
-  const finalQualities = isYoutubeSource ? ytQualities : detectedLevels;
-  const finalCurrentQuality = !currentQuality && isYoutubeSource ? 'auto' : currentQuality;
+  // --- LOGIKA PLAY/PAUSE MANUAL (UNTUK SHIELD) ---
+  const handleOverlayClick = (e: React.MouseEvent) => {
+     // Mencegah klik tembus ke iframe (walaupun pointer-events:none udah handle, ini double protection)
+     e.preventDefault();
+     e.stopPropagation();
+
+     if (playerRef.current) {
+        if (playerRef.current.paused()) {
+           playerRef.current.play();
+        } else {
+           playerRef.current.pause();
+        }
+        // Pastikan control bar muncul saat di tap (User Active)
+        playerRef.current.userActive(true);
+     }
+  };
 
   useEffect(() => {
     registerQualityMenu();
 
     if (!playerRef.current && videoRef.current) {
-      // 1. INIT PLAYER
       const videoElement = document.createElement('video-js');
       videoElement.classList.add('vjs-big-play-centered');
       
-      // Tambah Class Khusus buat FIX GAMBAR KEPOTONG
-      if (isYoutubeSource) {
-          videoElement.classList.add('vjs-youtube-mode');
-      } else {
-          // INI SOLUSI GAMBAR KEPOTONG: Class ini memaksa 'object-fit: contain'
-          videoElement.classList.add('vjs-idn-fix'); 
-      }
+      // Tambahkan class khusus untuk YouTube Mode
+      if (isYoutubeSource) videoElement.classList.add('vjs-youtube-safe-mode');
+      else videoElement.classList.add('vjs-idn-fix');
 
       videoRef.current.appendChild(videoElement);
 
-      const finalOptions = {
-        ...options,
-        techOrder: ['html5', 'youtube'],
-        controls: true,
-        bigPlayButton: true,
-        html5: {
-          vhs: { overrideNative: true }, // WAJIB TRUE
-          nativeAudioTracks: false,
-          nativeVideoTracks: false,
-        },
-        plugins: { qualityLevels: {} }, // Plugin Aktif
-        youtube: {
-          ytControls: 0,
-          modestbranding: 1,
-          iv_load_policy: 3,
-          rel: 0,
-          playsinline: 1,
-          ...options.youtube,
-        },
-      };
-
       const player = (playerRef.current = videojs(videoElement, finalOptions));
+      
+      if (options.sources && options.sources[0]) {
+          currentSrcRef.current = options.sources[0].src;
+      }
 
-      // --- AUTO DETECT RESOLUSI LISTENER ---
+      // --- AUTO DETECT RESOLUSI (KHUSUS HLS) ---
       player.ready(() => {
          // @ts-ignore
          const qLevels = player.qualityLevels();
-         if(qLevels) {
+         if(qLevels && !isYoutubeSource) {
              const updateLevels = () => {
                  const detected: {label:string, val:string}[] = [];
                  for(let i=0; i<qLevels.length; i++) {
                      if(qLevels[i].height) {
                          const lbl = qLevels[i].height + 'p';
-                         detected.push({ label: lbl, val: lbl });
+                         if (!detected.some(d => d.val === lbl)) detected.push({ label: lbl, val: lbl });
                      }
                  }
-                 // Filter unik & sort dari tinggi ke rendah
-                 const unique = [...new Map(detected.map(item => [item.val, item])).values()];
-                 unique.sort((a, b) => parseInt(b.val) - parseInt(a.val));
-                 
-                 // Simpan ke state biar tombol muncul
-                 if(unique.length > 0) {
-                     unique.unshift({ label: 'Auto', val: 'auto' });
-                     setDetectedLevels(unique); 
+                 if(detected.length > 0) {
+                     detected.sort((a, b) => parseInt(b.val) - parseInt(a.val));
+                     detected.unshift({ label: 'Auto', val: 'auto' });
+                     setDetectedLevels(prev => (JSON.stringify(prev) !== JSON.stringify(detected)) ? detected : prev); 
                  }
              };
-
-             // Dengerin event dari plugin
              qLevels.on('addqualitylevel', () => {
                  // @ts-ignore
                  if(window.hlsTimeout) clearTimeout(window.hlsTimeout);
@@ -290,42 +240,47 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
 
     } else if (playerRef.current) {
-      // 2. UPDATE PLAYER EXISTING
       const player = playerRef.current;
+      const newSrc = options.sources?.[0]?.src;
       
-      if (options.sources && options.sources.length > 0) {
-        player.src(options.sources);
+      // Update Source
+      if (newSrc && newSrc !== currentSrcRef.current) {
+          player.src(options.sources);
+          currentSrcRef.current = newSrc;
+          setDetectedLevels([]);
       }
 
-      // Pastikan Class CSS benar saat ganti source
+      // Toggle Mode Class
       if (isYoutubeSource) {
-        player.addClass('vjs-youtube-mode');
+        player.addClass('vjs-youtube-safe-mode');
         player.removeClass('vjs-idn-fix');
       } else {
-        player.removeClass('vjs-youtube-mode');
+        player.removeClass('vjs-youtube-safe-mode');
         player.addClass('vjs-idn-fix');
       }
 
-      // Re-render Tombol Menu jika ada perubahan detectedLevels
+      // RENDER QUALITY MENU (Untuk SEMUA Tipe, Termasuk YouTube)
+      // Kita hapus batasan !isYoutubeSource agar tombol gear muncul di YT juga
       const controlBar = (player as any).controlBar;
       if (controlBar) {
-          if (controlBar.getChild('QualityMenuButton')) {
-              controlBar.removeChild('QualityMenuButton');
-          }
-
-          if (finalQualities && finalQualities.length > 0) {
+          if (controlBar.getChild('QualityMenuButton')) controlBar.removeChild('QualityMenuButton');
+          
+          // Gunakan 'qualities' dari props (manual YT list) atau detected (HLS)
+          const qualitiesToRender = qualities && qualities.length > 0 ? qualities : detectedLevels;
+          
+          if (qualitiesToRender && qualitiesToRender.length > 0) {
               let insertIndex = controlBar.children_.length - 1;
               const fullscreenToggle = controlBar.getChild('FullscreenToggle');
+              // Taruh sebelah kiri Fullscreen button
               if (fullscreenToggle) {
                   const fsIndex = controlBar.children_.indexOf(fullscreenToggle);
                   if (fsIndex > -1) insertIndex = fsIndex;
               }
-
               controlBar.addChild(
                   'QualityMenuButton',
                   {
-                      qualities: finalQualities,
-                      currentQuality: finalCurrentQuality,
+                      qualities: qualitiesToRender,
+                      currentQuality: currentQuality,
                       onQualityChange,
                   },
                   insertIndex,
@@ -333,7 +288,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
       }
     }
-  }, [options, detectedLevels, finalCurrentQuality]); // Dependency updated ke detectedLevels
+  }, [options, isYoutubeSource, qualities, currentQuality, detectedLevels]);
 
   useEffect(() => {
     return () => {
@@ -345,11 +300,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   return (
-    <div className="w-full h-full relative overflow-hidden rounded-2xl bg-black">
-      {/* FIX KLIK 2 KALI & MOBILE: 
-          Kalau sudah play (!hasStarted false), overlay DIHAPUS TOTAL dari DOM.
-          Jadi tidak ada layer transparan yang menghalangi klik.
-      */}
+    <div className="w-full h-full relative overflow-hidden rounded-2xl bg-black group select-none">
+      
+      {/* --- START SCREEN (POSTER) --- */}
       {!hasStarted && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 cursor-pointer"
@@ -372,25 +325,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <div ref={videoRef} className="w-full h-full relative z-10" />
+      {/* --- INVISIBLE SHIELD (THE MAGIC LAYER) --- */}
+      {/* Layer ini berada di Z-Index 10 (Di atas Iframe, Di bawah Control Bar) */}
+      {/* Meng-handle Play/Pause saat area video diklik */}
+      {/* Mencegah klik tembus ke elemen YouTube di dalamnya */}
+      {isYoutubeSource && hasStarted && (
+          <div 
+             className="absolute inset-0 z-10 w-full h-full cursor-pointer bg-transparent"
+             onClick={handleOverlayClick}
+             onContextMenu={(e) => e.preventDefault()} // Disable Right Click
+          ></div>
+      )}
+
+      {/* --- VIDEO CONTAINER --- */}
+      <div ref={videoRef} className="w-full h-full relative z-0" />
 
       <style jsx global>{`
-        /* FIX GAMBAR KEPOTONG: 
-           Pake !important ganda biar gak kalah sama style inline VideoJS 
-        */
-        .video-js.vjs-idn-fix .vjs-tech {
+        /* --- STYLE KHUSUS YOUTUBE SHIELDING (MANIPULASI TINGKAT TINGGI) --- */
+        
+        /* 1. Matikan Pointer Events di Iframe YouTube */
+        /* Ini kuncinya: Iframe jadi "hantu", tidak bisa diklik sama sekali */
+        .video-js.vjs-youtube-safe-mode .vjs-tech { 
+          pointer-events: none !important; 
           object-fit: contain !important;
-          width: 100% !important;
-          height: 100% !important;
-          background-color: #000; /* Biar bar kiri-kanan hitam */
         }
 
-        .video-js.vjs-youtube-mode .vjs-tech {
-          object-fit: cover !important;
-          transform: scale(1.20) !important;
+        /* 2. Pastikan Control Bar Tetap Bisa Diklik & Berada di Atas Shield */
+        .video-js.vjs-youtube-safe-mode .vjs-control-bar {
+            z-index: 20 !important; /* Di atas Shield (z-10) */
+            pointer-events: auto !important; /* Hidupkan kembali pointer */
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            visibility: visible;
         }
 
-        /* Styling Menu Button */
+        /* 3. Styling Umum Video.js */
+        .video-js.vjs-idn-fix .vjs-tech { object-fit: contain !important; background-color: #000; }
+        
         .vjs-quality-menu-button {
           width: 44px !important; height: 100% !important;
           display: flex !important; align-items: center !important; justify-content: center !important;
@@ -400,33 +370,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           width: 22px !important; height: 22px !important; fill: white !important;
           filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); transition: transform 0.2s;
         }
-        .vjs-quality-menu-button:hover svg {
-          transform: rotate(45deg); fill: #eab308 !important;
-        }
+        .vjs-quality-menu-button:hover svg { transform: rotate(45deg); fill: #eab308 !important; }
         .vjs-menu-content {
           background: rgba(0, 0, 0, 0.9) !important; border-radius: 8px; overflow: hidden;
           bottom: 4em !important; width: 120px !important;
+          z-index: 100 !important;
         }
-        .vjs-menu-item {
-          text-transform: capitalize; padding: 8px 12px; background-color: transparent; color: white;
-        }
-        .vjs-menu-item:hover, .vjs-selected {
-            background-color: rgba(255, 255, 255, 0.1); color: #eab308 !important;
-        }
+        .vjs-menu-item { text-transform: capitalize; padding: 8px 12px; background-color: transparent; color: white; }
+        .vjs-menu-item:hover, .vjs-selected { background-color: rgba(255, 255, 255, 0.1); color: #eab308 !important; }
         
         .video-js .vjs-big-play-button, .vjs-loading-spinner { display: none !important; }
         .vjs-quality-selector { display: none !important; }
-
-        /* Memastikan Control Bar selalu responsif */
+        
+        /* Animasi Control Bar */
         .video-js.vjs-user-active .vjs-control-bar,
         .video-js.vjs-paused .vjs-control-bar {
-            opacity: 1 !important;
-            visibility: visible !important;
-            transition: opacity 0.3s ease;
+            opacity: 1 !important; visibility: visible !important; transition: opacity 0.3s ease;
         }
-        .video-js .vjs-control-bar {
-            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-        }
+        .video-js .vjs-control-bar { opacity: 0; transition: opacity 0.5s ease; }
+
+        /* Sembunyikan elemen tidak perlu di control bar */
+        .vjs-picture-in-picture-control { display: none !important; }
       `}</style>
     </div>
   );
