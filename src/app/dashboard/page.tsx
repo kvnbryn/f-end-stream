@@ -10,26 +10,16 @@ import { getBackendUrl } from '@/lib/config';
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
-  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
 };
-
-// Opsi kualitas manual untuk YouTube
-const YT_QUALITIES = [
-    { label: '1080p', val: 'hd1080' },
-    { label: '720p', val: 'hd720' },
-    { label: '480p', val: 'large' },
-    { label: '360p', val: 'medium' },
-    { label: 'Auto', val: 'auto' }
-];
 
 export default function DashboardPage() {
   const { token, logout, isLoading, role } = useAuth(); 
   const router = useRouter();
   
   // State Player
-  const [baseStreamUrl, setBaseStreamUrl] = useState<string | null>(null);
-  const [finalStreamUrl, setFinalStreamUrl] = useState<string | null>(null);
-  const [streamType, setStreamType] = useState<string>('video/youtube');
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [streamType, setStreamType] = useState<string>('application/x-mpegURL');
   const [streamTitle, setStreamTitle] = useState('');
   const [bgImage, setBgImage] = useState(''); 
   const [error, setError] = useState('');
@@ -43,7 +33,6 @@ export default function DashboardPage() {
   const [countdown, setCountdown] = useState('');
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
-  const [userEmail, setUserEmail] = useState('');
 
   const backendUrl = getBackendUrl();
 
@@ -58,7 +47,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${backendUrl}/api/v1/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
-      if (res.ok) { setDaysLeft(data.daysLeft); setUserEmail(data.email); }
+      if (res.ok) { setDaysLeft(data.daysLeft); }
     } catch (err) { console.error(err); }
   };
 
@@ -68,25 +57,6 @@ export default function DashboardPage() {
 
   const onQualityChange = (qVal: string, isInternalSwitch = false) => {
       setCurrentQuality(qVal);
-      
-      // JIKA INI HLS/M3U8 ATAU INTERNAL SWITCH, KITA BERHENTI. JANGAN RELOAD URL!
-      if (streamType === 'application/x-mpegURL' || (finalStreamUrl && finalStreamUrl.includes('.m3u8'))) {
-          console.log("[PAGE] Internal HLS Quality Switch detected. No Reload.");
-          return; 
-      }
-
-      if (isInternalSwitch) return;
-      if (!baseStreamUrl) return;
-      
-      setResumeTime(currentTimeRef.current);
-      setFinalStreamUrl(null); 
-      
-      const separator = baseStreamUrl.includes('?') ? '&' : '?';
-      const newUrl = `${baseStreamUrl}${separator}vq=${qVal}`;
-      
-      setTimeout(() => {
-          setFinalStreamUrl(newUrl);
-      }, 50); 
   };
 
   const fetchStreamData = async () => {
@@ -99,56 +69,47 @@ export default function DashboardPage() {
 
       setError(''); setStreamTitle(data.title); setBgImage(data.thumbnail);
       
-      if (data.qualities && Array.isArray(data.qualities) && data.qualities.length > 0) {
-          const formatted = data.qualities.map((q: any) => ({ label: q.label, val: q.label }));
-          formatted.unshift({ label: 'Auto', val: 'auto' });
-          setStreamQualities(formatted);
-      } else {
-          setStreamQualities([]);
-      }
-
       const startTime = new Date(data.start_time);
       const now = new Date();
 
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
 
       if (now >= startTime) {
-          // STREAMING MODE
+          // --- DETEKSI TIPE STREAM ---
+          
           if (data.stream_source === 'youtube') {
-             const ytRes = await fetch(`${backendUrl}/api/v1/stream/youtube-direct?url=${encodeURIComponent(data.custom_url)}`);
-             const ytData = await ytRes.json();
-             
-             if (ytData.videoId) {
-                 const ytUrl = `https://www.youtube.com/watch?v=${ytData.videoId}`;
-                 setBaseStreamUrl(ytUrl);
-                 setFinalStreamUrl(ytUrl); 
-                 setStreamType('video/youtube');
-                 setStreamQualities(YT_QUALITIES); 
-             } else {
-                 setError('Link Error');
-             }
+             // TYPE YOUTUBE: Url langsung dari DB, Type khusus
+             setStreamUrl(data.custom_url);
+             setStreamType('video/youtube');
+             setStreamQualities([]); // YouTube auto quality
 
           } else if (data.stream_source === 'external') {
-             setBaseStreamUrl(data.custom_url);
-             setFinalStreamUrl(data.custom_url);
-             // PASTIKAN INI ADALAH MPEGURL
+             setStreamUrl(data.custom_url);
              setStreamType('application/x-mpegURL'); 
+             
+             if (data.qualities && Array.isArray(data.qualities) && data.qualities.length > 0) {
+                const formatted = data.qualities.map((q: any) => ({ label: q.label, val: q.label }));
+                formatted.unshift({ label: 'Auto', val: 'auto' });
+                setStreamQualities(formatted);
+            } else {
+                setStreamQualities([]);
+            }
+
           } else {
-             // Internal
+             // Internal HLS
              const hlsUrl = `${backendUrl}/hls/${data.stream_key}/master.m3u8`;
-             setBaseStreamUrl(hlsUrl);
-             setFinalStreamUrl(hlsUrl);
+             setStreamUrl(hlsUrl);
              setStreamType('application/x-mpegURL');
              setStreamQualities([]); 
           }
           setCountdown('');
       } else {
-        setFinalStreamUrl(null);
+        setStreamUrl(null);
         startCountdown(startTime);
       }
 
     } catch (err: any) {
-      setFinalStreamUrl(null); 
+      setStreamUrl(null); 
       setStreamTitle('Menunggu Siaran'); 
       setCountdown(''); 
       setError(err.message === 'OFFLINE' ? 'OFFLINE' : err.message);
@@ -201,9 +162,13 @@ export default function DashboardPage() {
       router.push('/login'); 
   };
 
-  const videoJsOptions = finalStreamUrl ? {
-    autoplay: true, controls: true, responsive: true, fluid: true,
-    sources: [{ src: finalStreamUrl, type: streamType }],
+  const videoJsOptions = streamUrl ? {
+    autoplay: true, 
+    controls: true, 
+    responsive: true, 
+    fluid: true,
+    sources: [{ src: streamUrl, type: streamType }],
+    // videojs-youtube akan otomatis aktif karena tipe 'video/youtube'
   } : null;
 
   if (isLoading) return <div className="min-h-screen bg-black" />;
@@ -237,12 +202,12 @@ export default function DashboardPage() {
 
       <main className="flex-1 flex items-center justify-center relative p-4 md:p-12 mt-16 md:mt-0">
         <div className="w-full max-w-5xl relative z-10">
-          {finalStreamUrl && videoJsOptions ? (
+          {streamUrl && videoJsOptions ? (
             <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-700">
                <div className="relative rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 bg-black group">
                   <div className="relative z-10 aspect-video">
                       <VideoPlayer 
-                          key={finalStreamUrl} 
+                          key={streamUrl} 
                           options={videoJsOptions} 
                           poster={bgImage} 
                           qualities={streamQualities}
