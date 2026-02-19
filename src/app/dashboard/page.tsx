@@ -176,12 +176,12 @@ export default function DashboardPage() {
       </header>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 max-w-[1800px] mx-auto w-full p-4 md:p-8 lg:p-12 mt-20">
-        {/* Layout Grid: Items-Stretch memastikan tinggi kolom chat sama dengan player di Desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 lg:items-stretch">
+      <main className="flex-1 max-w-[1600px] mx-auto w-full p-4 md:p-8 lg:p-10 mt-16 md:mt-20 mb-8">
+        {/* Grid dengan items-stretch untuk menyamakan tinggi kolom */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:items-stretch">
           
-          {/* KOLOM KIRI: Player (Span 3) */}
-          <div className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {/* KOLOM KIRI: Player & Info Ringkas (Span 3) */}
+          <div className="lg:col-span-3 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {streamData && !countdown ? (
               <>
                 <VideoPlayer 
@@ -191,11 +191,12 @@ export default function DashboardPage() {
                   poster={streamData.thumbnail}
                 />
                 
-                <div className="bg-[#0a0a0a] p-8 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500/40"></div>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                {/* Info Section yang Ringkas */}
+                <div className="bg-[#0a0a0a] p-6 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/50"></div>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-2xl md:text-4xl font-black tracking-tight text-white mb-3 leading-tight uppercase">
+                      <h2 className="text-xl md:text-3xl font-black tracking-tight text-white mb-2 leading-tight uppercase">
                         {streamData.title}
                       </h2>
                       <div className="flex items-center gap-4">
@@ -204,21 +205,16 @@ export default function DashboardPage() {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                           </span>
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Live Broadcast</span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Live</span>
                         </div>
                         <span className="text-gray-800 text-xs">|</span>
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                          On Air {new Date(streamData.start_time).toLocaleTimeString()}
+                          Started at {new Date(streamData.start_time).toLocaleTimeString()}
                         </span>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="h-[1px] w-full bg-gradient-to-r from-white/10 via-white/5 to-transparent mb-6"></div>
-                  
-                  <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-4xl font-medium opacity-80">
-                    Selamat datang di layanan streaming premium. Jika terjadi kendala koneksi, silakan gunakan tombol switcher server yang tersedia di bagian bawah player. Layanan ini dioptimalkan untuk pengalaman digital terbaik lu.
-                  </p>
+                  {/* Deskripsi dan Separator DIHAPUS disini */}
                 </div>
               </>
             ) : (
@@ -238,7 +234,7 @@ export default function DashboardPage() {
                           <span className="text-4xl grayscale opacity-30">📡</span>
                         </div>
                         <h2 className="text-3xl font-black text-gray-600 tracking-tighter uppercase">Signal Offline</h2>
-                        <p className="text-gray-600 font-bold max-w-xs mx-auto text-xs uppercase tracking-widest">Belum ada siaran aktif yang terdaftar.</p>
+                        <p className="text-gray-600 font-bold max-w-xs mx-auto text-xs uppercase tracking-widest">Standby for transmission.</p>
                       </div>
                     ) : (
                       <div className="space-y-6">
@@ -251,7 +247,7 @@ export default function DashboardPage() {
                           </h2>
                         </div>
                         <div className="py-4">
-                          <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.5em] mb-4 opacity-50">Transmission Begins In</p>
+                          <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.5em] mb-4 opacity-50">Live In</p>
                           <div className="text-5xl md:text-9xl font-mono font-black text-white tracking-tighter tabular-nums drop-shadow-[0_10px_30px_rgba(0,0,0,1)]">
                             {countdown}
                           </div>
@@ -265,16 +261,17 @@ export default function DashboardPage() {
 
           {/* KOLOM KANAN: Live Chat (Span 1) */}
           <div className="lg:col-span-1 min-h-[450px] lg:min-h-0 animate-in fade-in slide-in-from-right-4 duration-1000 delay-300">
-            {/* H-full di Desktop supaya tingginya presisi sama dengan kolom player */}
+            {/* Container Chat yang dipaksa setinggi kolom sebelahnya */}
             <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] h-full flex flex-col overflow-hidden shadow-2xl">
-               <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+               <div className="p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Live Interaction</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Live Chat</span>
                   </div>
                   <Icons.Message />
                </div>
                
+               {/* Area Iframe yang mengisi sisa ruang */}
                <div className="flex-1 relative bg-black/40">
                   {youtubeIdForChat ? (
                     <iframe 
@@ -283,13 +280,13 @@ export default function DashboardPage() {
                         frameBorder="0"
                     ></iframe>
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12 text-gray-700">
-                        <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center mb-6 border border-white/5">
-                          <span className="text-2xl font-black italic opacity-20">!</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 text-gray-700">
+                        <div className="w-14 h-14 bg-white/5 rounded-3xl flex items-center justify-center mb-4 border border-white/5">
+                          <span className="text-xl font-black italic opacity-30">!</span>
                         </div>
-                        <p className="text-[10px] uppercase font-black tracking-widest mb-2">Chat Unavailable</p>
-                        <p className="text-[9px] leading-relaxed font-bold opacity-40 uppercase tracking-tight">
-                          Gunakan jalur YouTube untuk berinteraksi dengan penonton lainnya secara Real-time.
+                        <p className="text-[10px] uppercase font-black tracking-widest mb-2">Chat Offline</p>
+                        <p className="text-[9px] leading-relaxed font-bold opacity-50 uppercase tracking-tight max-w-[150px]">
+                          Fitur chat hanya tersedia untuk siaran YouTube.
                         </p>
                     </div>
                   )}
@@ -301,10 +298,9 @@ export default function DashboardPage() {
       </main>
       
       {/* --- FOOTER --- */}
-      <footer className="p-16 text-center">
-         <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent mx-auto mb-10"></div>
+      <footer className="p-10 text-center">
          <p className="text-[9px] text-gray-700 font-black uppercase tracking-[0.8em] opacity-40">
-            Realtime48 &bull; Digital System &bull; 2026
+            Realtime48 &bull; 2026
          </p>
       </footer>
     </div>
