@@ -5,419 +5,161 @@ import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import 'videojs-youtube';
 
-// --- KONFIGURASI IMPORT AMAN ---
-if (typeof window !== 'undefined') {
-  // Plugin ini wajib buat baca master.m3u8 dan kasih data ke menu kita
-  // @ts-ignore
-  if (!videojs.getPlugin('qualityLevels')) require('videojs-contrib-quality-levels');
-}
-
-// --- CONSTANTS ---
-const YOUTUBE_QUALITY_MAP: { [key: string]: string } = {
-  '1080p': 'hd1080',
-  '720p': 'hd720',
-  '480p': 'large',
-  '360p': 'medium',
-  '240p': 'small',
-  'auto': 'default',
-  'source': 'highres',
-};
-
-// --- HELPER: CUSTOM MENU BUTTON ---
-const registerQualityMenu = () => {
-  if (typeof window === 'undefined') return;
-
-  const MenuButton = videojs.getComponent('MenuButton') as any;
-  const MenuItem = videojs.getComponent('MenuItem') as any;
-
-  if (videojs.getComponent('QualityMenuButton')) return;
-
-  class QualityMenuItem extends MenuItem {
-    constructor(player: any, options: any) {
-      super(player, { ...options, selectable: true });
-    }
-
-    handleClick() {
-      const player = this.player();
-      const targetValue = this.options_.value; 
-
-      // Visual Reset (Uncheck semua yg lain)
-      // @ts-ignore
-      const menuParent = this.parentComponent_; 
-      if (menuParent && menuParent.children_) {
-        menuParent.children().forEach((child: any) => {
-           if (child !== this) child.selected(false);
-        });
-      }
-      this.selected(true);
-
-      const isYouTube = player.techName_ === 'Youtube';
-
-      // 1. LOGIKA YOUTUBE
-      if (isYouTube) {
-        const tech = player.tech(true);
-        const ytPlayer = tech.ytPlayer || (tech as any).ytPlayer_ || (player as any).ytPlayer;
-        if (ytPlayer && typeof ytPlayer.setPlaybackQuality === 'function') {
-          try { ytPlayer.setPlaybackQuality(YOUTUBE_QUALITY_MAP[targetValue] || 'default'); } catch (e) {}
-          if (this.options_.callback) this.options_.callback(targetValue, true);
-        }
-        return; 
-      }
-
-      // 2. LOGIKA HLS (INTERNAL)
-      // @ts-ignore
-      const qualityLevels = player.qualityLevels ? player.qualityLevels() : null;
-
-      if (qualityLevels && qualityLevels.length > 0) {
-        console.log('[Player] Switching Quality to:', targetValue);
-
-        // Loop semua level yang ada
-        for (let i = 0; i < qualityLevels.length; i++) {
-          const lvl = qualityLevels[i];
-          // Jika Auto dipilih -> enable semua level
-          if (targetValue === 'auto') {
-             lvl.enabled = true;
-          } else {
-             // Jika manual (misal 360p) -> enable hanya yang cocok
-             const label = lvl.height ? (lvl.height + 'p') : '';
-             lvl.enabled = (label === targetValue);
-          }
-        }
-
-        if (this.options_.callback) this.options_.callback(targetValue, true);
-      }
-    }
-  }
-
-  class QualityMenuButton extends MenuButton {
-    constructor(player: any, options: any) {
-      super(player, options);
-      this.addClass('vjs-quality-menu-button');
-      (this as any).controlText('Quality');
-    }
-
-    createEl() {
-      const el = super.createEl('button', {
-        className: 'vjs-menu-button vjs-menu-button-popup vjs-control vjs-button vjs-quality-menu-button',
-      });
-      el.innerHTML = `
-        <div class="vjs-quality-icon-container">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-            <path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 00-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 00-2.282.819l-.922 1.597a1.875 1.875 0 00.432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 000 1.139c.016.2-.059.352-.153.43l-.841.692a1.875 1.875 0 00-.432 2.385l.922 1.597a1.875 1.875 0 002.282.819l1.019-.393c.115-.044.283-.032.45.083a7.49 7.49 0 00.986.57c.182.088.277.228.297.348l.177 1.072c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.177-1.072c.02-.12.115-.26.297-.348.325-.157.639-.345.937-.562.166-.115.334-.126.45-.083l1.019.393a1.875 1.875 0 002.282-.819l.922-1.597a1.875 1.875 0 00-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 000-1.139c-.016-.2.059-.352.153-.43l.841-.692a1.875 1.875 0 00.432-2.385l-.922-1.597a1.875 1.875 0 00-2.282-.819l-1.019.393c-.115.044-.283.032-.45-.083-.298-.217-.612-.405-.937-.562-.182-.088-.277-.228-.297-.348l-.177-1.072c-.151-.904-.933-1.567-1.85-1.567h-1.844zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
-          </svg>
-        </div>
-      `;
-      return el;
-    }
-
-    createItems() {
-      // @ts-ignore
-      const list = this.options_.qualities || [];
-      // @ts-ignore
-      return list.map((q: any) => {
-        return new QualityMenuItem(this.player(), {
-          label: q.label,
-          value: q.val,
-          // @ts-ignore
-          callback: this.options_.onQualityChange,
-          // @ts-ignore
-          selected: q.val === this.options_.currentQuality,
-        });
-      });
-    }
-  }
-
-  videojs.registerComponent('QualityMenuButton', QualityMenuButton as any);
-};
-
 // --- INTERFACE ---
-interface VideoPlayerProps {
-  options: {
-    autoplay: boolean;
-    controls: boolean;
-    responsive: boolean;
-    fluid: boolean;
-    techOrder?: string[];
-    sources: { src: string; type: string }[];
-    youtube?: any;
-  };
-  poster?: string;
-  qualities?: { label: string; val: string }[]; 
-  currentQuality?: string;
-  onQualityChange?: (val: string, isInternalSwitch?: boolean) => void;
-  startTime?: number;
-  onTimeUpdate?: (time: number) => void;
+interface StreamSource {
+  name: string;
+  url: string;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  options,
-  poster,
-  qualities, 
-  currentQuality,
-  onQualityChange,
-  startTime = 0,
-  onTimeUpdate,
-}) => {
+interface VideoPlayerProps {
+  sources: StreamSource[];
+  activeSourceIndex: number;
+  onSwitchSource: (index: number) => void;
+  poster?: string;
+}
+
+export default function VideoPlayer({ 
+  sources, 
+  activeSourceIndex, 
+  onSwitchSource, 
+  poster 
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
-  const currentSrcRef = useRef<string | null>(null);
+  const currentSource = sources[activeSourceIndex];
 
-  const [hasStarted, setHasStarted] = useState(startTime > 0);
-  const [detectedLevels, setDetectedLevels] = useState<{ label: string; val: string }[]>([]);
-
-  const isYoutubeSource = options.sources?.[0]?.type === 'video/youtube';
-
-  const ytQualities = [
-    { label: 'Auto', val: 'auto' },
-    { label: '1080p', val: '1080p' },
-    { label: '720p', val: '720p' },
-    { label: '480p', val: '480p' },
-    { label: '360p', val: '360p' },
-  ];
-
-  const finalQualities = isYoutubeSource ? ytQualities : detectedLevels;
-  const finalCurrentQuality = !currentQuality && isYoutubeSource ? 'auto' : currentQuality;
-
-  useEffect(() => {
-    registerQualityMenu();
-
-    if (!playerRef.current && videoRef.current) {
-      // --- INITIALIZE PLAYER ---
-      const videoElement = document.createElement('video-js');
-      videoElement.classList.add('vjs-big-play-centered');
-      if (!isYoutubeSource) videoElement.classList.add('vjs-idn-fix');
-      if (isYoutubeSource) videoElement.classList.add('vjs-youtube-mode');
-
-      videoRef.current.appendChild(videoElement);
-
-      const finalOptions = {
-        ...options,
-        techOrder: ['html5', 'youtube'],
-        controls: true,
-        bigPlayButton: true,
-        html5: {
-          vhs: { overrideNative: true }, 
-          nativeAudioTracks: false,
-          nativeVideoTracks: false,
-        },
-        plugins: { qualityLevels: {} },
-        youtube: {
-          ytControls: 0, // Matikan kontrol native youtube
-          modestbranding: 1,
-          iv_load_policy: 3,
-          rel: 0,
-          playsinline: 1,
-          ...options.youtube,
-        },
-      };
-
-      const player = (playerRef.current = videojs(videoElement, finalOptions));
-      
-      if (options.sources && options.sources[0]) {
-          currentSrcRef.current = options.sources[0].src;
-      }
-
-      // --- AUTO DETECT RESOLUSI DARI MASTER PLAYLIST ---
-      player.ready(() => {
-         // @ts-ignore
-         const qLevels = player.qualityLevels();
-         if(qLevels) {
-             const updateLevels = () => {
-                 const detected: {label:string, val:string}[] = [];
-                 
-                 for(let i=0; i<qLevels.length; i++) {
-                     if(qLevels[i].height) {
-                         const lbl = qLevels[i].height + 'p';
-                         if (!detected.some(d => d.val === lbl)) {
-                             detected.push({ label: lbl, val: lbl });
-                         }
-                     }
-                 }
-                 
-                 if(detected.length > 0) {
-                     detected.sort((a, b) => parseInt(b.val) - parseInt(a.val));
-                     detected.unshift({ label: 'Auto', val: 'auto' });
-
-                     setDetectedLevels(prev => {
-                        if (JSON.stringify(prev) !== JSON.stringify(detected)) {
-                            console.log('[Player] Quality Levels Found:', detected);
-                            return detected;
-                        }
-                        return prev;
-                     }); 
-                 }
-             };
-
-             qLevels.on('addqualitylevel', () => {
-                 // @ts-ignore
-                 if(window.hlsTimeout) clearTimeout(window.hlsTimeout);
-                 // @ts-ignore
-                 window.hlsTimeout = setTimeout(updateLevels, 500);
-             });
-         }
-      });
-
-      player.on('play', () => setHasStarted(true));
-      player.on('playing', () => setHasStarted(true));
-      player.on('timeupdate', () => {
-        if (onTimeUpdate) {
-          const time = player.currentTime();
-          if (typeof time === 'number') onTimeUpdate(time);
-        }
-      });
-
-      if (startTime > 0) {
-        setHasStarted(true);
-        player.ready(() => {
-            player.currentTime(startTime);
-            player.play();
-        });
-      }
-
-    } else if (playerRef.current) {
-      // --- UPDATE PLAYER EXISTING ---
-      const player = playerRef.current;
-      
-      const newSrc = options.sources?.[0]?.src;
-      if (newSrc && newSrc !== currentSrcRef.current) {
-          console.log('[Player] Source changed, reloading video...');
-          player.src(options.sources);
-          currentSrcRef.current = newSrc;
-          setDetectedLevels([]);
-      }
-
-      if (isYoutubeSource) {
-        player.addClass('vjs-youtube-mode');
-        player.removeClass('vjs-idn-fix');
-      } else {
-        player.removeClass('vjs-youtube-mode');
-        player.addClass('vjs-idn-fix');
-      }
-
-      // --- RENDER TOMBOL MENU ---
-      const controlBar = (player as any).controlBar;
-      if (controlBar) {
-          if (controlBar.getChild('QualityMenuButton')) {
-              controlBar.removeChild('QualityMenuButton');
-          }
-
-          if (finalQualities && finalQualities.length > 0) {
-              let insertIndex = controlBar.children_.length - 1;
-              const fullscreenToggle = controlBar.getChild('FullscreenToggle');
-              if (fullscreenToggle) {
-                  const fsIndex = controlBar.children_.indexOf(fullscreenToggle);
-                  if (fsIndex > -1) insertIndex = fsIndex;
-              }
-
-              controlBar.addChild(
-                  'QualityMenuButton',
-                  {
-                      qualities: finalQualities,
-                      currentQuality: finalCurrentQuality,
-                      onQualityChange,
-                  },
-                  insertIndex,
-              );
-          }
-      }
+  // Fungsi deteksi otomatis tipe stream berdasarkan URL
+  const getSourceType = (url: string) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      return 'video/youtube';
     }
-  }, [options, finalQualities, finalCurrentQuality]); 
+    // Default dianggap HLS (.m3u8)
+    return 'application/x-mpegURL';
+  };
 
   useEffect(() => {
+    // Pastikan elemen video ada dan source tersedia
+    if (!videoRef.current || !currentSource) return;
+
+    // Buat elemen video-js secara dinamis
+    const videoElement = document.createElement('video-js');
+    videoElement.classList.add('vjs-big-play-centered', 'vjs-fluid');
+    videoRef.current.appendChild(videoElement);
+
+    // Inisialisasi Player
+    const player = playerRef.current = videojs(videoElement, {
+      autoplay: true,
+      controls: true,
+      responsive: true,
+      fluid: true,
+      poster: poster,
+      playbackRates: [0.5, 1, 1.5, 2],
+      techOrder: ['html5', 'youtube'],
+      sources: [{
+        src: currentSource.url,
+        type: getSourceType(currentSource.url)
+      }],
+      youtube: {
+        iv_load_policy: 3,
+        modestbranding: 1,
+        rel: 0,
+        showinfo: 0,
+        playsinline: 1
+      },
+      userActions: {
+        hotkeys: true
+      }
+    });
+
+    // Cleanup saat komponen unmount atau source berubah
     return () => {
-      if (playerRef.current && !playerRef.current.isDisposed()) {
-        playerRef.current.dispose();
+      if (player && !player.isDisposed()) {
+        player.dispose();
         playerRef.current = null;
       }
+      if (videoRef.current) {
+        videoRef.current.innerHTML = '';
+      }
     };
-  }, []);
+  }, [currentSource, poster]);
 
   return (
-    <div className="w-full h-full relative overflow-hidden rounded-2xl bg-black">
-      {!hasStarted && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 cursor-pointer"
-          onClick={() => { if (playerRef.current) playerRef.current.play(); }}
-        >
-          {poster && (
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-70"
-              style={{ backgroundImage: `url('${poster}')` }}
-            />
-          )}
-          <div className="relative z-10 flex flex-col items-center justify-center animate-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.6)] hover:scale-110 transition-transform">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black" className="w-10 h-10 ml-1">
-                <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-              </svg>
+    <div className="w-full flex flex-col gap-0 shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-black group">
+      {/* Container Player */}
+      <div className="relative aspect-video bg-black">
+        <div data-vjs-player>
+          <div ref={videoRef} className="w-full h-full" />
+        </div>
+      </div>
+      
+      {/* Switcher Server - Layout Pro & Terukur */}
+      <div className="p-4 bg-[#0a0a0a] border-t border-white/5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </div>
-            <p className="mt-4 text-xs text-white/80 font-bold tracking-[0.2em] uppercase text-shadow">Tap to Start Stream</p>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+              Jalur Pengiriman Data
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            {sources && sources.length > 0 ? (
+              sources.map((src, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSwitchSource(idx)}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-black transition-all duration-300 border uppercase tracking-widest ${
+                    activeSourceIndex === idx 
+                      ? 'bg-yellow-500 border-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.2)]' 
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  {src.name || `Server ${idx + 1}`}
+                </button>
+              ))
+            ) : (
+              <span className="text-[10px] text-gray-600 italic uppercase">Konfigurasi Server Belum Tersedia</span>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
-      <div ref={videoRef} className="w-full h-full relative z-10" />
-
+      {/* Style Tambahan untuk VideoJS agar Fit & Professional */}
       <style jsx global>{`
-        /* KHUSUS HLS/IDN: Pakai Contain biar pas */
-        .video-js.vjs-idn-fix .vjs-tech {
-          object-fit: contain !important;
-          background-color: #000;
+        .video-js {
+          font-family: inherit;
         }
-
-        /* KHUSUS YOUTUBE */
-        /* 1. Hapus Scale (Biar normal) */
-        .video-js.vjs-youtube-mode .vjs-tech {
-          object-fit: contain !important;
-          transform: none !important; /* Gak di-zoom lagi */
+        .vjs-big-play-button {
+          background-color: rgba(234, 179, 8, 0.9) !important;
+          border-radius: 50% !important;
+          width: 80px !important;
+          height: 80px !important;
+          line-height: 80px !important;
+          margin-top: -40px !important;
+          margin-left: -40px !important;
+          border: none !important;
+          box-shadow: 0 0 30px rgba(234, 179, 8, 0.4) !important;
         }
-        
-        /* 2. Matikan Interaksi Mouse ke Iframe Youtube */
-        /* Ini kuncinya: Logo & Watch On Youtube gak bisa diklik karena iframe-nya "tembus pandang" */
-        .video-js.vjs-youtube-mode iframe {
-            pointer-events: none !important;
+        .vjs-big-play-button:hover {
+          background-color: #eab308 !important;
+          transform: scale(1.1);
+          transition: transform 0.2s ease-in-out !important;
         }
-
-        /* Styling Menu Kualitas */
-        .vjs-quality-menu-button {
-          width: 44px !important; height: 100% !important;
-          display: flex !important; align-items: center !important; justify-content: center !important;
-          cursor: pointer !important; margin-left: 4px !important; 
+        .vjs-control-bar {
+          background: linear-gradient(to top, rgba(0,0,0,1), transparent) !important;
+          height: 50px !important;
         }
-        .vjs-quality-icon-container svg {
-          width: 22px !important; height: 22px !important; fill: white !important;
-          filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); transition: transform 0.2s;
+        .video-js .vjs-tech {
+          object-fit: contain;
         }
-        .vjs-quality-menu-button:hover svg {
-          transform: rotate(45deg); fill: #eab308 !important;
-        }
-        .vjs-menu-content {
-          background: rgba(0, 0, 0, 0.9) !important; border-radius: 8px; overflow: hidden;
-          bottom: 4em !important; width: 120px !important;
-        }
-        .vjs-menu-item {
-          text-transform: capitalize; padding: 8px 12px; background-color: transparent; color: white;
-        }
-        .vjs-menu-item:hover, .vjs-selected {
-            background-color: rgba(255, 255, 255, 0.1); color: #eab308 !important;
-        }
-        .video-js .vjs-big-play-button, .vjs-loading-spinner { display: none !important; }
-        .vjs-quality-selector { display: none !important; }
-        
-        /* Control Bar Selalu Muncul Saat Pause/Active */
-        .video-js.vjs-user-active .vjs-control-bar,
-        .video-js.vjs-paused .vjs-control-bar {
-            opacity: 1 !important;
-            visibility: visible !important;
-            transition: opacity 0.3s ease;
-            z-index: 20; /* Pastikan di atas iframe */
-        }
-        .video-js .vjs-control-bar {
-            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+        /* Fix Youtube Iframe Z-Index */
+        .vjs-youtube .vjs-iframe-blocker {
+          display: none !important;
         }
       `}</style>
     </div>
   );
-};
-
-export default VideoPlayer; 
+}
