@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client'; 
 import { getBackendUrl } from '@/lib/config'; 
 
-// --- ICONS STRICT ---
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
@@ -129,7 +128,7 @@ export default function DashboardPage() {
       <main className="flex-1 min-h-0 w-full flex items-center justify-center p-2 md:p-3 lg:p-4">
         <div className="w-full max-w-[1750px] h-full flex flex-col lg:flex-row gap-3 lg:items-stretch">
           
-          {/* KOLOM PLAYER (LEFT) - Fleksibel mengikuti tinggi layar */}
+          {/* KOLOM PLAYER (LEFT) */}
           <div className="flex-[2.8] flex flex-col gap-3 min-h-0 h-full">
             {streamData && !countdown ? (
               <>
@@ -142,17 +141,34 @@ export default function DashboardPage() {
                   />
                 </div>
                 
-                <div className="h-[70px] shrink-0 bg-[#0a0a0a] px-5 flex items-center justify-between rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
+                {/* INFO BAR: Judul Sejajar dengan Selector Server */}
+                <div className="h-[60px] shrink-0 bg-[#0a0a0a] px-5 flex items-center justify-between rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
-                  <div className="flex flex-col gap-1 overflow-hidden">
-                    <h2 className="text-sm md:text-lg font-black text-white uppercase truncate">{streamData.title}</h2>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1.5 w-1.5 bg-red-500"></span></span>
-                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
-                      </div>
-                      <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Start: {new Date(streamData.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  
+                  {/* Bagian Kiri: Judul & Status */}
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <h2 className="text-sm md:text-base font-black text-white uppercase truncate max-w-[200px] md:max-w-md">{streamData.title}</h2>
+                    <div className="flex items-center gap-2">
+                       <span className="relative flex h-1 w-1"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1 w-1 bg-red-500"></span></span>
+                       <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Transmitting</span>
                     </div>
+                  </div>
+
+                  {/* Bagian Kanan: Selector Server (Sesuai Coretan Merah Lu) */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar ml-4">
+                    {streamData.sources?.map((src: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveSourceIdx(idx)}
+                        className={`px-3 py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all border uppercase tracking-widest whitespace-nowrap ${
+                          activeSourceIdx === idx 
+                            ? 'bg-yellow-500 border-yellow-500 text-black shadow-lg shadow-yellow-500/20' 
+                            : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'
+                        }`}
+                      >
+                        {src.name || `Server ${idx + 1}`}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </>
@@ -174,7 +190,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* KOLOM CHAT (RIGHT) - Tinggi Wajib Presisi dengan Kolom Kiri */}
+          {/* KOLOM CHAT (RIGHT) */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -190,7 +206,6 @@ export default function DashboardPage() {
                     <iframe 
                         src={`https://www.youtube.com/live_chat?v=${youtubeIdForChat}&embed_domain=${typeof window !== 'undefined' ? window.location.hostname : ''}`}
                         className="absolute inset-0 w-full h-full border-0"
-                        style={{ height: '100%' }}
                     ></iframe>
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20">
@@ -205,9 +220,8 @@ export default function DashboardPage() {
         </div>
       </main>
       
-      {/* --- FOOTER (MINIMAL) --- */}
-      <footer className="h-8 flex items-center justify-center shrink-0 border-t border-white/[0.02]">
-         <p className="text-[7px] text-gray-700 font-black uppercase tracking-[1em] opacity-40">Realtime48 &bull; 2026</p>
+      <footer className="h-6 flex items-center justify-center shrink-0">
+         <p className="text-[6px] text-gray-700 font-black uppercase tracking-[1em] opacity-40">Realtime48 &bull; 2026</p>
       </footer>
     </div>
   );
