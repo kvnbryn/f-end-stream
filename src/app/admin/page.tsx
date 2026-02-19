@@ -23,7 +23,6 @@ type User = {
     Subscription: Subscription | null; 
 };
 
-// Interface baru untuk mendukung Multi-Server
 type StreamSource = { name: string; url: string }; 
 
 type Schedule = { 
@@ -127,7 +126,6 @@ export default function AdminPage() {
   const [newScheduleTime, setNewScheduleTime] = useState('');
   const [newScheduleThumbnail, setNewScheduleThumbnail] = useState('');
   const [newSchedulePrice, setNewSchedulePrice] = useState('');
-  // State baru untuk Multi-Server
   const [streamSources, setStreamSources] = useState<StreamSource[]>([{ name: 'Server 1', url: '' }]);
 
   const [pkgTitle, setPkgTitle] = useState('');
@@ -205,7 +203,7 @@ export default function AdminPage() {
     }
   }, [token, activeTab, fetchUsers, isLoading]);
 
-  // --- ACTIONS ---
+  // --- ACTIONS (INCLUDING MISSING HANDLERS) ---
   const isUserExpired = (user: User) => {
       if (user.status === 'PENDING') return false;
       if (!user.Subscription) return true;
@@ -228,6 +226,12 @@ export default function AdminPage() {
       fetchUsers();
   };
 
+  const handleApproveClick = (user: User) => {
+      setEditingUser(user);
+      setUserFormDuration(30); 
+      setShowApproveModal(true);
+  };
+
   const handleConfirmApprove = async () => {
       if (!editingUser) return;
       await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}/approve`, {
@@ -237,6 +241,77 @@ export default function AdminPage() {
       });
       setShowApproveModal(false);
       fetchUsers();
+  };
+
+  // HANDLER YANG TADI HILANG
+  const handleResetDevice = async (id: string) => {
+      if(!confirm('Reset kunci perangkat user ini?')) return;
+      try {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/${id}/reset-device`, {
+              method: 'PUT', headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if(res.ok) { showToast('Device Reset!', 'success'); fetchUsers(); }
+      } catch (e) { showToast('Gagal reset device', 'error'); }
+  };
+
+  const handleEditUserClick = (user: User) => {
+      setEditingUser(user);
+      setUserFormEmail(user.email);
+      setUserFormDuration(0);
+      setShowEditUserModal(true);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+      if(!confirm('Hapus user ini selamanya?')) return;
+      try {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/${id}`, {
+              method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if(res.ok) { showToast('User Deleted', 'success'); fetchUsers(); }
+      } catch (e) { showToast('Gagal hapus user', 'error'); }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) })
+          });
+          if(res.ok) { showToast('User Created!', 'success'); setShowUserModal(false); fetchUsers(); }
+      } catch (e) { showToast('Gagal membuat user', 'error'); }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if(!editingUser) return;
+      try {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/${editingUser.id}`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined })
+          });
+          if(res.ok) { showToast('User Updated!', 'success'); setShowEditUserModal(false); fetchUsers(); }
+      } catch (e) { showToast('Gagal update user', 'error'); }
+  };
+
+  const handleBulkImport = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setBulkLoading(true);
+      try {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ rawText: bulkText, durationDays: Number(bulkDuration) })
+          });
+          const data = await res.json();
+          showToast(data.message, 'success');
+          setBulkText('');
+          setShowBulkModal(false);
+          fetchUsers();
+      } catch (e) { showToast('Gagal import bulk', 'error'); }
+      finally { setBulkLoading(false); }
   };
 
   // --- DYNAMIC SOURCE LOGIC ---
@@ -305,14 +380,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteSchedule = async (id: string) => {
-    if(!confirm('Hapus jadwal?')) return;
-    await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, {
-      method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-    });
-    fetchGlobalData();
-  };
-
   const handleToggleSchedule = async (s: Schedule) => {
     const action = s.is_active ? 'stop' : 'activate';
     await fetch(`${backendUrl}/api/v1/admin/schedules/${s.id}/${action}`, {
@@ -332,6 +399,23 @@ export default function AdminPage() {
       body: JSON.stringify(payload)
     });
     if(res.ok) { setShowPackageModal(false); fetchGlobalData(); }
+  };
+
+  const handleTogglePackageStatus = async (pkg: Package) => {
+    await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !pkg.is_active })
+    });
+    fetchGlobalData();
+  };
+
+  const handleDeletePackage = async (id: string) => {
+    if(!confirm('Hapus paket?')) return;
+    await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+    });
+    fetchGlobalData();
   };
 
   // --- MEDIA UPLOAD ---
@@ -354,6 +438,12 @@ export default function AdminPage() {
       fetchMedia();
     }
     setUploading(false);
+  };
+
+  const handleSelectMedia = (url: string) => {
+    if (mediaMode === 'schedule') setNewScheduleThumbnail(url);
+    else if (mediaMode === 'package') setPkgImage(url);
+    setShowMediaModal(false);
   };
 
   if (isLoading || !token) return <div className="min-h-screen bg-black" />;
@@ -419,7 +509,7 @@ export default function AdminPage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-white/5 text-gray-500 uppercase tracking-[0.2em] text-[10px] font-black">
                     <tr>
-                        <th className="p-6 w-4"><input type="checkbox" onChange={() => setUsers(u => u)} className="accent-yellow-500" /></th>
+                        <th className="p-6 w-4"><input type="checkbox" className="accent-yellow-500" /></th>
                         <th className="p-6">User Identity</th>
                         <th className="p-6">Plan Status</th>
                         <th className="p-6 text-center">Device Lock</th>
@@ -452,7 +542,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* --- SCHEDULES TAB (Multi-Server) --- */}
+        {/* --- SCHEDULES TAB --- */}
         {activeTab === 'schedules' && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {schedules.map((s) => (
@@ -478,59 +568,145 @@ export default function AdminPage() {
             ))}
           </div>
         )}
+
+        {/* --- OFFERS TAB --- */}
+        {activeTab === 'offers' && (
+          <div className="space-y-12">
+            <div className="bg-[#0a0a0a] border border-white/5 rounded-[2rem] p-8 flex flex-col md:flex-row items-center gap-8">
+               <div className="w-32 h-32 bg-white rounded-2xl overflow-hidden relative group shrink-0 border border-white/10">
+                  {qrisUrl ? <img src={qrisUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-black font-black text-[10px]">NO QRIS</div>}
+                  <div onClick={() => {setMediaMode('qris'); setShowMediaModal(true); fetchMedia();}} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-all uppercase text-[9px] font-black">Ganti QRIS</div>
+               </div>
+               <div><h3 className="text-xl font-black text-white mb-2">QRIS Payment Gateway</h3><p className="text-gray-500 text-xs leading-relaxed max-w-md">Update gambar QRIS utama untuk memproses pembayaran manual dari user baru.</p></div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+               {packages.map(p => (
+                 <div key={p.id} className={`bg-[#0a0a0a] border border-white/5 rounded-[2rem] p-8 relative flex flex-col group ${!p.is_active && 'opacity-40 grayscale'}`}>
+                    <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                       <button onClick={() => {setEditingPackage(p); handleSavePackage(null as any);}} className="text-gray-500 hover:text-white"><Icons.Edit /></button>
+                       <button onClick={() => handleDeletePackage(p.id)} className="text-gray-500 hover:text-red-500"><Icons.Trash /></button>
+                    </div>
+                    {p.image_url && <img src={p.image_url} className="h-16 w-16 rounded-xl object-cover mb-6" />}
+                    <h3 className="text-lg font-black text-white mb-1">{p.title}</h3>
+                    <div className="text-2xl font-black text-yellow-500 mb-6 font-mono">Rp {p.price.toLocaleString()}</div>
+                    <button onClick={() => handleTogglePackageStatus(p)} className="mt-auto w-full py-3 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all">{p.is_active ? 'Disable' : 'Enable'}</button>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* --- MULTI-SERVER SCHEDULE MODAL --- */}
+      {/* --- MODALS --- */}
+
+      {/* CREATE/EDIT USER */}
+      {(showUserModal || showEditUserModal) && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2rem] p-10 relative">
+                <button onClick={() => {setShowUserModal(false); setShowEditUserModal(false);}} className="absolute top-8 right-8 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-2xl font-black text-white mb-8 tracking-tighter">{showEditUserModal ? 'Update User' : 'New Access'}</h3>
+                <form onSubmit={showEditUserModal ? handleUpdateUser : handleCreateUser} className="space-y-6">
+                    <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">User Email</label><input type="email" value={userFormEmail} onChange={e => setUserFormEmail(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none focus:border-yellow-500" required /></div>
+                    <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Duration (Days)</label><input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none focus:border-yellow-500" required /></div>
+                    <button type="submit" className="w-full bg-white text-black font-black py-4 rounded-xl hover:bg-yellow-500 transition-all uppercase text-xs tracking-widest">Process Data</button>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* APPROVE MODAL */}
+      {showApproveModal && editingUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-10 relative">
+                <button onClick={() => setShowApproveModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-2xl font-black text-white mb-4 tracking-tighter">Approve User</h3>
+                <p className="text-xs text-gray-500 mb-8 font-mono">{editingUser.email}</p>
+                {editingUser.last_order_info && (
+                    <div className="bg-yellow-500/5 border border-yellow-500/10 p-6 rounded-2xl mb-8 text-xs text-yellow-200 leading-relaxed italic">
+                        <strong>Order Info:</strong><br/>{editingUser.last_order_info}
+                    </div>
+                )}
+                <div className="space-y-6">
+                    <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Duration (Days)</label><input type="number" value={userFormDuration} onChange={e => setUserFormDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none focus:border-green-500" /></div>
+                    <button onClick={handleConfirmApprove} className="w-full bg-green-500 text-black font-black py-4 rounded-xl hover:scale-105 transition-all uppercase text-xs tracking-widest">Activate Access</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* SCHEDULE MODAL (Multi-Server) */}
       {showScheduleModal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[2.5rem] p-8 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[2.5rem] p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <button onClick={() => setShowScheduleModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white"><Icons.X /></button>
-                <h3 className="text-3xl font-black text-white mb-10 tracking-tighter">Konfigurasi Siaran</h3>
-                
+                <h3 className="text-3xl font-black text-white mb-10 tracking-tighter">Event Config</h3>
                 <form onSubmit={handleSaveSchedule} className="space-y-8">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Judul Event</label>
-                        <input type="text" value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-bold outline-none focus:border-yellow-500 transition-all" required />
+                    <div className="space-y-2"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Judul Event</label><input type="text" value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-bold outline-none" required /></div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Time</label><input type="datetime-local" value={newScheduleTime} onChange={e => setNewScheduleTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none" required /></div>
+                        <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Price</label><input type="number" value={newSchedulePrice} onChange={e => setNewSchedulePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none" /></div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Waktu Mulai</label>
-                            <input type="datetime-local" value={newScheduleTime} onChange={e => setNewScheduleTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-bold outline-none focus:border-yellow-500" required />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Harga Akses</label>
-                            <input type="number" value={newSchedulePrice} onChange={e => setNewSchedulePrice(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-bold outline-none focus:border-yellow-500" />
-                        </div>
-                    </div>
-
-                    {/* DYNAMIC SOURCES SECTION */}
-                    <div className="space-y-4 pt-4 border-t border-white/5">
-                        <div className="flex justify-between items-center mb-6">
-                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Management Server Stream</label>
-                           <button type="button" onClick={addSourceField} className="bg-white/5 hover:bg-white/10 text-white text-[9px] font-black px-4 py-2 rounded-full border border-white/10 transition-all uppercase tracking-widest">+ Add Server</button>
-                        </div>
-                        
+                    <div className="space-y-4 pt-6 border-t border-white/5">
+                        <div className="flex justify-between items-center"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Server Sources</label><button type="button" onClick={addSourceField} className="bg-white/5 text-white text-[9px] font-black px-4 py-2 rounded-full border border-white/10 uppercase">+ Add</button></div>
                         <div className="space-y-4">
                           {streamSources.map((src, idx) => (
-                            <div key={idx} className="bg-white/[0.02] border border-white/5 p-6 rounded-[1.5rem] relative group">
-                               <div className="flex flex-col md:flex-row gap-4">
-                                  <div className="flex-1 space-y-2">
-                                     <input placeholder="Nama Server (Contoh: Server 1)" value={src.name} onChange={e => updateSourceField(idx, 'name', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-xs font-bold py-2 outline-none focus:border-yellow-500 text-white" />
-                                     <input placeholder="URL Stream (.m3u8 atau Link YouTube)" value={src.url} onChange={e => updateSourceField(idx, 'url', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[10px] py-2 outline-none focus:border-yellow-500 text-gray-400" required />
-                                  </div>
-                                  {streamSources.length > 1 && (
-                                    <button type="button" onClick={() => removeSourceField(idx)} className="text-red-500/50 hover:text-red-500 transition-colors self-center p-2"><Icons.Trash /></button>
-                                  )}
+                            <div key={idx} className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex gap-4">
+                               <div className="flex-1 space-y-2">
+                                  <input placeholder="Server Name" value={src.name} onChange={e => updateSourceField(idx, 'name', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-xs font-bold py-2 outline-none text-white" />
+                                  <input placeholder="URL Link" value={src.url} onChange={e => updateSourceField(idx, 'url', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[10px] py-2 outline-none text-gray-400" required />
                                </div>
+                               {streamSources.length > 1 && <button type="button" onClick={() => removeSourceField(idx)} className="text-red-500/30 hover:text-red-500 transition-colors self-center"><Icons.Trash /></button>}
                             </div>
                           ))}
                         </div>
                     </div>
+                    <button type="submit" className="w-full bg-yellow-500 text-black font-black py-5 rounded-2xl uppercase tracking-widest text-xs">Save Schedule</button>
+                </form>
+            </div>
+        </div>
+      )}
 
-                    <div className="pt-8 flex gap-4">
-                       <button type="submit" className="flex-1 bg-yellow-500 text-black font-black py-5 rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-yellow-500/20 uppercase tracking-[0.2em] text-xs">Simpan & Publish Siaran</button>
+      {/* MEDIA MODAL */}
+      {showMediaModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-4xl rounded-[3rem] p-12 relative h-[85vh] flex flex-col">
+                <button onClick={() => setShowMediaModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase tracking-widest">Media Library</h3>
+                <div className="mb-10 p-12 border-2 border-dashed border-white/5 rounded-[2rem] text-center relative bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
+                    <input type="file" accept="image/*" onChange={handleUploadMedia} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                    <div className="pointer-events-none flex flex-col items-center">
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 border border-white/10 transition-all ${uploading ? 'animate-spin' : 'group-hover:scale-110'}`}>{uploading ? <Icons.Logout /> : <Icons.Upload />}</div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{uploading ? 'Uploading...' : 'Click to Upload New Assets'}</p>
                     </div>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-6">
+                        {mediaFiles.map((file, idx) => (
+                            <div key={idx} onClick={() => handleSelectMedia(file.url)} className="aspect-square bg-white/5 rounded-2xl overflow-hidden border border-white/5 hover:border-yellow-500 cursor-pointer group relative transition-all">
+                                <img src={file.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 group-hover:rotate-2" />
+                                <div className="absolute inset-0 bg-yellow-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                                    <span className="text-[10px] text-black font-black uppercase tracking-widest">Select</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* BULK IMPORT */}
+      {showBulkModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-lg rounded-[2.5rem] p-12 relative">
+                <button onClick={() => setShowBulkModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white"><Icons.X /></button>
+                <h3 className="text-2xl font-black text-white mb-4 tracking-tighter">Bulk Import</h3>
+                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-10">Pemisah baris baru (\n) atau koma (,)</p>
+                <form onSubmit={handleBulkImport} className="space-y-6">
+                    <div><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Duration (Days)</label><input type="number" value={bulkDuration} onChange={(e) => setBulkDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold outline-none" required /></div>
+                    <textarea className="w-full h-56 bg-white/5 border border-white/10 rounded-2xl p-6 text-white text-xs font-mono outline-none focus:border-yellow-500" placeholder="user1@mail.com&#10;user2@mail.com" value={bulkText} onChange={(e) => setBulkText(e.target.value)} required />
+                    <button type="submit" disabled={bulkLoading} className="w-full bg-white text-black font-black py-4 rounded-xl hover:bg-yellow-500 transition-all uppercase text-xs tracking-widest disabled:opacity-50">{bulkLoading ? 'Processing...' : 'Start Injection'}</button>
                 </form>
             </div>
         </div>
@@ -541,7 +717,6 @@ export default function AdminPage() {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
         input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
       `}</style>
     </div>
