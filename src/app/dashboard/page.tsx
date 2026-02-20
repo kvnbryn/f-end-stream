@@ -106,7 +106,7 @@ export default function DashboardPage() {
             )}
         </div>
         <div className="flex items-center gap-2 md:gap-4">
-          <a href="http://inforealtime48.my.id/ReplayMembership.html" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-gray-300 transition-all uppercase tracking-widest"><Icons.Film /> <span className="hidden sm:inline">Replay</span></a>
+          <a href="https://realtime48show.my.id/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-gray-300 transition-all uppercase tracking-widest"><Icons.Film /> <span className="hidden sm:inline">Replay</span></a>
           {role === 'ADMIN' && (<button onClick={() => router.push('/admin')} className="hidden md:block text-[9px] font-black text-gray-500 hover:text-yellow-500 uppercase tracking-widest transition-colors">Admin</button>)}
           <button onClick={logout} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white text-gray-400 transition-all border border-white/5"><Icons.Logout /></button>
         </div>
