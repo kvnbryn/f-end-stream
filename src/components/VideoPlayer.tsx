@@ -5,21 +5,13 @@ import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import 'videojs-youtube';
 
-// Import plugin pendeteksi resolusi
 if (typeof window !== 'undefined') {
   // @ts-ignore
-  if (!videojs.getPlugin('qualityLevels')) {
-    require('videojs-contrib-quality-levels');
-  }
+  if (!videojs.getPlugin('qualityLevels')) require('videojs-contrib-quality-levels');
 }
 
 const YOUTUBE_QUALITY_MAP: { [key: string]: string } = {
-  '1080p': 'hd1080',
-  '720p': 'hd720',
-  '480p': 'large',
-  '360p': 'medium',
-  '240p': 'small',
-  'auto': 'default',
+  '1080p': 'hd1080', '720p': 'hd720', '480p': 'large', '360p': 'medium', '240p': 'small', 'auto': 'default',
 };
 
 const registerQualityMenu = () => {
@@ -29,28 +21,21 @@ const registerQualityMenu = () => {
   if (videojs.getComponent('QualityMenuButton')) return;
 
   class QualityMenuItem extends MenuItem {
-    constructor(player: any, options: any) {
-      super(player, { ...options, selectable: true });
-    }
+    constructor(player: any, options: any) { super(player, { ...options, selectable: true }); }
     handleClick() {
       const player = this.player();
-      const targetValue = this.options_.value;
+      const targetValue = this.options_.value; 
       // @ts-ignore
-      const menuParent = this.parentComponent_;
+      const menuParent = this.parentComponent_; 
       if (menuParent && menuParent.children_) {
-        menuParent.children().forEach((child: any) => {
-          if (child !== this) child.selected(false);
-        });
+        menuParent.children().forEach((child: any) => { if (child !== this) child.selected(false); });
       }
       this.selected(true);
-
       if (player.techName_ === 'Youtube') {
         const tech = player.tech(true);
         const ytPlayer = tech.ytPlayer || (tech as any).ytPlayer_ || (player as any).ytPlayer;
         if (ytPlayer && typeof ytPlayer.setPlaybackQuality === 'function') {
-          try {
-            ytPlayer.setPlaybackQuality(YOUTUBE_QUALITY_MAP[targetValue] || 'default');
-          } catch (e) {}
+          try { ytPlayer.setPlaybackQuality(YOUTUBE_QUALITY_MAP[targetValue] || 'default'); } catch (e) {}
           if (this.options_.callback) this.options_.callback(targetValue);
         }
       } else {
@@ -58,11 +43,8 @@ const registerQualityMenu = () => {
         const qLevels = player.qualityLevels ? player.qualityLevels() : null;
         if (qLevels) {
           for (let i = 0; i < qLevels.length; i++) {
-            if (targetValue === 'auto') {
-              qLevels[i].enabled = true;
-            } else {
-              qLevels[i].enabled = qLevels[i].height + 'p' === targetValue;
-            }
+            if (targetValue === 'auto') qLevels[i].enabled = true;
+            else qLevels[i].enabled = ((qLevels[i].height + 'p') === targetValue);
           }
           if (this.options_.callback) this.options_.callback(targetValue);
         }
@@ -71,34 +53,19 @@ const registerQualityMenu = () => {
   }
 
   class QualityMenuButton extends MenuButton {
-    constructor(player: any, options: any) {
-      super(player, options);
-      this.addClass('vjs-quality-menu-button');
-      (this as any).controlText('Quality');
-    }
+    constructor(player: any, options: any) { super(player, options); this.addClass('vjs-quality-menu-button'); }
     createEl() {
-      const el = super.createEl('button', {
-        className: 'vjs-menu-button vjs-menu-button-popup vjs-control vjs-button vjs-quality-menu-button',
-      });
+      const el = super.createEl('button', { className: 'vjs-menu-button vjs-menu-button-popup vjs-control vjs-button vjs-quality-menu-button' });
       el.innerHTML = `
-        <div class="vjs-quality-icon" style="display:flex;align-items:center;justify-content:center;height:100%;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <div class="vjs-quality-icon" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin: auto;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </div>`;
       return el;
     }
     createItems() {
       // @ts-ignore
       const list = this.options_.qualities || [];
-      return list.map((q: any) => {
-        return new QualityMenuItem(this.player(), {
-          label: q.label,
-          value: q.val,
-          // @ts-ignore
-          callback: this.options_.onQualityChange,
-          // @ts-ignore
-          selected: q.val === this.options_.currentQuality,
-        });
-      });
+      return list.map((q: any) => new QualityMenuItem(this.player(), { label: q.label, value: q.val, callback: this.options_.onQualityChange, selected: q.val === this.options_.currentQuality }));
     }
   }
   videojs.registerComponent('QualityMenuButton', QualityMenuButton as any);
@@ -129,10 +96,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
     videoRef.current.appendChild(videoElement);
 
     const player = playerRef.current = videojs(videoElement, {
-      autoplay: true,
-      controls: true,
-      responsive: true,
-      fluid: false,
+      autoplay: true, controls: true, responsive: true, fluid: false,
       techOrder: ['html5', 'youtube'],
       sources: [{ src: currentSource.url, type: getSourceType(currentSource.url) }],
       plugins: { qualityLevels: {} },
@@ -196,6 +160,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
 
     if (controlBar && finalQualities.length > 0) {
       if (controlBar.getChild('QualityMenuButton')) controlBar.removeChild('QualityMenuButton');
+      
       const fsToggle = controlBar.getChild('FullscreenToggle');
       const insertIndex = fsToggle ? controlBar.children_.indexOf(fsToggle) : controlBar.children_.length;
       
@@ -218,11 +183,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
         </div>
       )}
 
-      {/* OVERLAY SECURITY: Memblokir klik ke YouTube tapi membiarkan control bar tetap interaktif */}
       {isYoutube && hasStarted && (
         <div 
           className="absolute inset-0 z-10 cursor-pointer" 
-          style={{ height: 'calc(100% - 40px)' }} // Sisakan 40px di bawah untuk control bar
+          style={{ height: 'calc(100% - 40px)' }} 
           onClick={() => {
             if (playerRef.current.paused()) playerRef.current.play();
             else playerRef.current.pause();
@@ -237,44 +201,58 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
         .video-js.vjs-idn-fix .vjs-tech { object-fit: contain !important; }
         .video-js.vjs-youtube-mode .vjs-tech { object-fit: contain !important; transform: none !important; pointer-events: none !important; }
         
-        /* FIX CONTROL BAR LAYOUT */
         .vjs-control-bar {
           background: rgba(0, 0, 0, 0.8) !important;
           height: 40px !important;
           display: flex !important;
           align-items: center !important;
           z-index: 20 !important;
+          padding: 0 5px !important;
         }
 
-        .vjs-button { width: 40px !important; height: 40px !important; }
-        .vjs-control:before { line-height: 40px !important; font-size: 1.8em !important; }
+        /* FIX ALIGNMENT KANAN: Gear dan Fullscreen harus rapat kanan */
+        .vjs-custom-control-spacer { display: flex !important; flex: 1 !important; }
 
-        /* Progress Control Standar */
-        .vjs-progress-control { flex: 1 !important; display: flex !important; align-items: center !important; padding: 0 10px !important; }
-        .vjs-play-progress:before { font-size: 1em !important; top: -0.3em !important; }
-
-        /* Time Display Sejajar */
-        .vjs-current-time, .vjs-time-divider, .vjs-duration-display {
-          display: flex !important;
-          padding: 0 2px !important;
-          font-size: 11px !important;
-          line-height: 40px !important;
-          min-width: 0 !important;
+        .vjs-button { 
+          width: 36px !important; 
+          height: 40px !important; 
+          margin: 0 !important;
+          padding: 0 !important;
         }
 
-        /* Quality Gear Button */
         .vjs-quality-menu-button {
+          order: 10 !important; /* Pastikan di kanan spacer */
+          width: 36px !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          cursor: pointer !important;
         }
-        .vjs-quality-icon svg { transition: transform 0.2s; }
-        .vjs-quality-menu-button:hover .vjs-quality-icon svg { color: #eab308; transform: rotate(30deg); }
 
-        .vjs-menu-content { background: rgba(0, 0, 0, 0.95) !important; border-radius: 8px !important; bottom: 40px !important; }
-        .vjs-menu-item { padding: 8px 15px !important; font-size: 10px !important; text-transform: uppercase; font-weight: 900; }
-        .vjs-selected { color: #eab308 !important; }
+        .vjs-fullscreen-control {
+          order: 11 !important; /* Paling kanan */
+          width: 36px !important;
+        }
+
+        .vjs-current-time, .vjs-time-divider, .vjs-duration-display {
+          display: flex !important;
+          font-size: 11px !important;
+          line-height: 40px !important;
+          padding: 0 2px !important;
+        }
+
+        .vjs-quality-icon svg { transition: transform 0.2s ease; }
+        .vjs-quality-menu-button:hover .vjs-quality-icon svg { color: #eab308; transform: rotate(45deg); }
+
+        .vjs-menu-content { 
+          background: rgba(0, 0, 0, 0.95) !important; 
+          border-radius: 8px !important; 
+          bottom: 45px !important; 
+          right: -10px !important;
+          left: auto !important;
+          width: 100px !important;
+        }
+        .vjs-menu-item { padding: 10px !important; font-size: 10px !important; text-transform: uppercase; font-weight: 900; text-align: center !important; }
+        .vjs-selected { color: #eab308 !important; background: rgba(255,255,255,0.05) !important; }
 
         .vjs-big-play-button { display: none !important; }
       `}</style>
