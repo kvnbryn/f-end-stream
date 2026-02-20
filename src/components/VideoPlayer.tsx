@@ -56,9 +56,10 @@ const registerQualityMenu = () => {
     constructor(player: any, options: any) { super(player, options); this.addClass('vjs-quality-menu-button'); }
     createEl() {
       const el = super.createEl('button', { className: 'vjs-menu-button vjs-menu-button-popup vjs-control vjs-button vjs-quality-menu-button' });
+      // Centering the icon within the clickable button area
       el.innerHTML = `
-        <div class="vjs-quality-icon" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin: auto;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <div class="vjs-quality-icon" style="display:flex;align-items:center;justify-content:center;height:100%;pointer-events:none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </div>`;
       return el;
     }
@@ -84,6 +85,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
 
   const getSourceType = (url: string) => (url.includes('youtube.com') || url.includes('youtu.be')) ? 'video/youtube' : 'application/x-mpegURL';
   const isYoutube = currentSource ? getSourceType(currentSource.url) === 'video/youtube' : false;
+
+  const handleFullscreenLogic = async () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (player.isFullscreen()) {
+      // @ts-ignore
+      if (screen.orientation?.lock) await screen.orientation.lock('landscape').catch(() => {});
+    } else {
+      // @ts-ignore
+      if (screen.orientation?.unlock) screen.orientation.unlock();
+    }
+  };
 
   useEffect(() => {
     registerQualityMenu();
@@ -137,10 +150,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
       }
     });
 
+    player.on('fullscreenchange', handleFullscreenLogic);
     player.on('play', () => setHasStarted(true));
 
     return () => {
       if (player && !player.isDisposed()) {
+        player.off('fullscreenchange', handleFullscreenLogic);
         player.dispose();
         playerRef.current = null;
       }
@@ -152,7 +167,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
     if (!playerRef.current) return;
     const player = playerRef.current;
     const controlBar = (player as any).controlBar;
-    
     const ytQualities = [
       { label: 'Auto', val: 'auto' }, { label: '1080p', val: '1080p' }, { label: '720p', val: '720p' }, { label: '480p', val: '480p' }, { label: '360p', val: '360p' },
     ];
@@ -160,7 +174,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
 
     if (controlBar && finalQualities.length > 0) {
       if (controlBar.getChild('QualityMenuButton')) controlBar.removeChild('QualityMenuButton');
-      
       const fsToggle = controlBar.getChild('FullscreenToggle');
       const insertIndex = fsToggle ? controlBar.children_.indexOf(fsToggle) : controlBar.children_.length;
       
@@ -201,6 +214,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
         .video-js.vjs-idn-fix .vjs-tech { object-fit: contain !important; }
         .video-js.vjs-youtube-mode .vjs-tech { object-fit: contain !important; transform: none !important; pointer-events: none !important; }
         
+        /* FIXING THE DAMN CONTROL BAR */
         .vjs-control-bar {
           background: rgba(0, 0, 0, 0.8) !important;
           height: 40px !important;
@@ -210,49 +224,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
           padding: 0 5px !important;
         }
 
-        /* FIX ALIGNMENT KANAN: Gear dan Fullscreen harus rapat kanan */
-        .vjs-custom-control-spacer { display: flex !important; flex: 1 !important; }
-
-        .vjs-button { 
-          width: 36px !important; 
-          height: 40px !important; 
-          margin: 0 !important;
-          padding: 0 !important;
+        /* Elements must be forced into a single flex row */
+        .vjs-control-bar > div, .vjs-control-bar > button {
+           position: relative !important;
+           top: auto !important;
+           left: auto !important;
+           display: flex !important;
+           align-items: center !important;
+           height: 100% !important;
         }
 
-        .vjs-quality-menu-button {
-          order: 10 !important; /* Pastikan di kanan spacer */
-          width: 36px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-
-        .vjs-fullscreen-control {
-          order: 11 !important; /* Paling kanan */
-          width: 36px !important;
-        }
+        .vjs-progress-control { flex: 1 !important; height: 100% !important; }
+        .vjs-custom-control-spacer { display: none !important; } /* Remove spacer to prevent weird gaps */
 
         .vjs-current-time, .vjs-time-divider, .vjs-duration-display {
-          display: flex !important;
           font-size: 11px !important;
           line-height: 40px !important;
           padding: 0 2px !important;
+          min-width: 0 !important;
         }
 
-        .vjs-quality-icon svg { transition: transform 0.2s ease; }
-        .vjs-quality-menu-button:hover .vjs-quality-icon svg { color: #eab308; transform: rotate(45deg); }
-
-        .vjs-menu-content { 
-          background: rgba(0, 0, 0, 0.95) !important; 
-          border-radius: 8px !important; 
-          bottom: 45px !important; 
-          right: -10px !important;
+        /* Quality Gear Button - Precise Click Area */
+        .vjs-quality-menu-button {
+          width: 40px !important;
+          cursor: pointer !important;
+        }
+        
+        .vjs-menu-content {
+          background: rgba(0, 0, 0, 0.95) !important;
+          border-radius: 8px !important;
+          bottom: 45px !important;
+          right: 0 !important;
           left: auto !important;
-          width: 100px !important;
         }
-        .vjs-menu-item { padding: 10px !important; font-size: 10px !important; text-transform: uppercase; font-weight: 900; text-align: center !important; }
-        .vjs-selected { color: #eab308 !important; background: rgba(255,255,255,0.05) !important; }
 
         .vjs-big-play-button { display: none !important; }
       `}</style>
