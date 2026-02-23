@@ -156,7 +156,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* CHAT TAWK.TO */}
+          {/* CHAT TAWK.TO (CORRECTED) */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -164,9 +164,9 @@ export default function DashboardPage() {
                   <Icons.Message />
                </div>
                <div className="flex-1 relative bg-black/20">
-                  {/* Iframe Tawk.to Embedded Chat */}
+                  {/* PAKE LINK DIRECT CHAT BUKAN EMBED SCRIPT URL */}
                   <iframe 
-                    src="https://embed.tawk.to/699c5fe69293fb1c3a27029f/1ji5dd7kn" 
+                    src="https://tawk.to/chat/699c5fe69293fb1c3a27029f/1ji5dd7kn" 
                     className="absolute inset-0 w-full h-full border-0"
                     title="Live Chat"
                   ></iframe>
