@@ -22,12 +22,24 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [countdown, setCountdown] = useState('');
+  const [chatUrl, setChatUrl] = useState(''); // STATE CHAT DINAMIS
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
 
   useEffect(() => {
     if (!isLoading && !token) router.push('/login');
   }, [isLoading, token, router]);
+
+  // FUNGSI NARIK CONFIG (CHAT URL)
+  const fetchGlobalConfig = async () => {
+    try {
+      const res = await fetch(`${backendUrl}/api/v1/public/config`);
+      const data = await res.json();
+      if (res.ok) {
+        setChatUrl(data.chatUrl || '');
+      }
+    } catch (err) { console.error("Config fetch error:", err); }
+  };
 
   const fetchUserData = async () => {
     if (!token) return;
@@ -75,7 +87,9 @@ export default function DashboardPage() {
   
   useEffect(() => {
     if (!isLoading && token) {
-      fetchUserData(); fetchStreamData();
+      fetchUserData(); 
+      fetchStreamData();
+      fetchGlobalConfig(); // AMBIL CONFIG SAAT LOAD
       const socket: Socket = io(backendUrl);
       socket.on('SCHEDULE_UPDATED', () => fetchStreamData());
       return () => { 
@@ -156,7 +170,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* CHAT TAWK.TO (CORRECTED) */}
+          {/* DYNAMIC CHAT SECTION */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -164,12 +178,17 @@ export default function DashboardPage() {
                   <Icons.Message />
                </div>
                <div className="flex-1 relative bg-black/20">
-                  {/* PAKE LINK DIRECT CHAT BUKAN EMBED SCRIPT URL */}
-                  <iframe 
-                    src="https://tawk.to/chat/699c5fe69293fb1c3a27029f/1ji5dd7kn" 
-                    className="absolute inset-0 w-full h-full border-0"
-                    title="Live Chat"
-                  ></iframe>
+                  {chatUrl ? (
+                    <iframe 
+                      src={chatUrl} 
+                      className="absolute inset-0 w-full h-full border-0"
+                      title="Live Chat"
+                    ></iframe>
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20">
+                      <p className="text-[8px] uppercase font-black tracking-widest text-gray-500">Interaction Offline</p>
+                    </div>
+                  )}
                </div>
             </div>
           </div>
