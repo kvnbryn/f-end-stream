@@ -85,17 +85,11 @@ export default function DashboardPage() {
     }
   }, [isLoading, token, backendUrl]); 
 
-  const getYoutubeId = (url: string) => {
-    const match = url?.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
-  const youtubeIdForChat = getYoutubeId(streamData?.sources?.[activeSourceIdx]?.url || '');
-
   if (isLoading) return <div className="h-screen bg-black" />;
 
   return (
     <div className="h-screen max-h-screen bg-[#050505] text-white font-sans overflow-hidden flex flex-col">
+      {/* HEADER */}
       <header className="h-14 px-4 md:px-6 flex justify-between items-center bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
         <div className="flex items-center gap-4">
             <h1 className="text-base font-black tracking-tighter text-yellow-500 uppercase">Realtime<span className="text-white">48</span></h1>
@@ -112,6 +106,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* VIEWPORT */}
       <main className="flex-1 min-h-0 w-full flex items-center justify-center p-2 md:p-3 lg:p-4">
         <div className="w-full max-w-[1750px] h-full flex flex-col lg:flex-row gap-3 lg:items-stretch">
           
@@ -122,7 +117,6 @@ export default function DashboardPage() {
                   <VideoPlayer sources={streamData.sources || []} activeSourceIndex={activeSourceIdx} onSwitchSource={(idx) => setActiveSourceIdx(idx)} poster={streamData.thumbnail} />
                 </div>
                 
-                {/* INFO BAR: Judul & Servers Sejajar (Your Red-Line Request) */}
                 <div className="h-[60px] shrink-0 bg-[#0a0a0a] px-5 flex items-center justify-between rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
@@ -162,6 +156,7 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* CHAT TAWK.TO */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -169,9 +164,12 @@ export default function DashboardPage() {
                   <Icons.Message />
                </div>
                <div className="flex-1 relative bg-black/20">
-                  {youtubeIdForChat ? (<iframe src={`https://www.youtube.com/live_chat?v=${youtubeIdForChat}&embed_domain=${typeof window !== 'undefined' ? window.location.hostname : ''}`} className="absolute inset-0 w-full h-full border-0"></iframe>) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20"><p className="text-[8px] uppercase font-black tracking-widest">Chat Offline</p></div>
-                  )}
+                  {/* Iframe Tawk.to Embedded Chat */}
+                  <iframe 
+                    src="https://embed.tawk.to/699c5fe69293fb1c3a27029f/1ji5dd7kn" 
+                    className="absolute inset-0 w-full h-full border-0"
+                    title="Live Chat"
+                  ></iframe>
                </div>
             </div>
           </div>
