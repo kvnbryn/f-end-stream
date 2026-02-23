@@ -22,7 +22,8 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [countdown, setCountdown] = useState('');
-  const [chatUrl, setChatUrl] = useState(''); // STATE CHAT DINAMIS
+  const [chatUrl, setChatUrl] = useState(''); 
+  const chatContainerRef = useRef<HTMLDivElement>(null); // REF UNTUK INJEKSI SCRIPT
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
 
@@ -30,14 +31,11 @@ export default function DashboardPage() {
     if (!isLoading && !token) router.push('/login');
   }, [isLoading, token, router]);
 
-  // FUNGSI NARIK CONFIG (CHAT URL)
   const fetchGlobalConfig = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/v1/public/config`);
       const data = await res.json();
-      if (res.ok) {
-        setChatUrl(data.chatUrl || '');
-      }
+      if (res.ok) setChatUrl(data.chatUrl || '');
     } catch (err) { console.error("Config fetch error:", err); }
   };
 
@@ -89,7 +87,7 @@ export default function DashboardPage() {
     if (!isLoading && token) {
       fetchUserData(); 
       fetchStreamData();
-      fetchGlobalConfig(); // AMBIL CONFIG SAAT LOAD
+      fetchGlobalConfig();
       const socket: Socket = io(backendUrl);
       socket.on('SCHEDULE_UPDATED', () => fetchStreamData());
       return () => { 
@@ -98,6 +96,19 @@ export default function DashboardPage() {
       };
     }
   }, [isLoading, token, backendUrl]); 
+
+  // LOGIKA PINTAR: EKSEKUSI SCRIPT JIKA INPUTNYA <SCRIPT>
+  useEffect(() => {
+    if (chatUrl && chatUrl.includes('<script') && chatContainerRef.current) {
+        const container = chatContainerRef.current;
+        container.innerHTML = ''; // Bersihkan kontainer
+        
+        // Gunakan Range untuk memaksa script luar dieksekusi di DOM
+        const range = document.createRange();
+        const fragment = range.createContextualFragment(chatUrl);
+        container.appendChild(fragment);
+    }
+  }, [chatUrl]);
 
   if (isLoading) return <div className="h-screen bg-black" />;
 
@@ -177,13 +188,23 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2"><div className="w-1 h-1 bg-red-600 rounded-full animate-pulse"></div><span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Interaction</span></div>
                   <Icons.Message />
                </div>
-               <div className="flex-1 relative bg-black/20">
+               <div className="flex-1 relative bg-black/20 overflow-hidden">
                   {chatUrl ? (
-                    <iframe 
-                      src={chatUrl} 
-                      className="absolute inset-0 w-full h-full border-0"
-                      title="Live Chat"
-                    ></iframe>
+                    // CEK APAKAH INPUT ADALAH URL ATAU SCRIPT TAG
+                    !chatUrl.includes('<script') ? (
+                        <iframe 
+                          src={chatUrl} 
+                          className="absolute inset-0 w-full h-full border-0"
+                          title="Live Chat"
+                        ></iframe>
+                    ) : (
+                        <div 
+                           ref={chatContainerRef} 
+                           className="absolute inset-0 w-full h-full flex items-center justify-center p-2"
+                        >
+                            {/* Script tag akan diinjeksi di sini oleh useEffect */}
+                        </div>
+                    )
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20">
                       <p className="text-[8px] uppercase font-black tracking-widest text-gray-500">Interaction Offline</p>
