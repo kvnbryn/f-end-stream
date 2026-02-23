@@ -67,15 +67,16 @@ const Icons = {
   ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
   Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
   Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
 };
 
 export default function AdminPage() {
-  const { token, logout, isLoading } = useAuth();
+  const { token, logout, isLoading, role } = useAuth();
   const router = useRouter();
   const backendUrl = getBackendUrl();
   
   // --- NAVIGATION STATE ---
-  const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers' | 'settings'>('users');
   
   // --- USERS DATA STATE ---
   const [users, setUsers] = useState<User[]>([]);
@@ -92,6 +93,7 @@ export default function AdminPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [qrisUrl, setQrisUrl] = useState('');
+  const [chatUrl, setChatUrl] = useState('');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
 
   // --- MODALS STATE ---
@@ -139,7 +141,6 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // --- LOGIC SEARCH DEBOUNCE ---
   useEffect(() => {
     const timer = setTimeout(() => {
         setDebouncedSearch(searchTerm);
@@ -148,7 +149,6 @@ export default function AdminPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // --- DATA FETCHERS ---
   const fetchUsers = useCallback(async () => {
     if (!token) return;
     setIsLoadingUsers(true);
@@ -185,6 +185,7 @@ export default function AdminPage() {
              const data = await resPkg.json();
              setPackages(data.packages);
              setQrisUrl(data.qrisUrl);
+             setChatUrl(data.chatUrl || ''); 
          }
      } catch (e) { console.error(e); }
   };
@@ -322,6 +323,18 @@ export default function AdminPage() {
           fetchUsers();
       } catch (e) { showToast('Import gagal', 'error'); }
       finally { setBulkLoading(false); }
+  };
+
+  // --- SETTINGS ACTIONS ---
+  const handleSaveChatUrl = async () => {
+    try {
+        const res = await fetch(`${backendUrl}/api/v1/admin/settings/chat`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: chatUrl })
+        });
+        if (res.ok) showToast('Chat URL Updated!', 'success');
+    } catch (err) { showToast('Gagal update chat', 'error'); }
   };
 
   // --- ACTIONS: MULTI-SERVER SOURCES ---
@@ -505,7 +518,7 @@ export default function AdminPage() {
   return (
     <div className="flex min-h-screen bg-[#050505] text-gray-100 font-sans flex-col md:flex-row">
       
-      {/* --- NAVBAR TOP (MOBILE & DESKTOP) --- */}
+      {/* --- NAVBAR TOP --- */}
       <header className="h-16 px-4 md:px-8 flex justify-between items-center bg-black/60 backdrop-blur-xl border-b border-white/5 fixed top-0 left-0 right-0 z-[60]">
         <div className="flex items-center gap-4">
             <h1 className="text-lg font-black tracking-tighter text-yellow-500 uppercase">
@@ -522,12 +535,13 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* --- SIDEBAR (DESKTOP) --- */}
+      {/* --- SIDEBAR --- */}
       <aside className="hidden md:flex w-64 flex-col border-r border-white/5 bg-black/50 backdrop-blur-xl fixed h-screen top-16 z-50">
         <nav className="flex-1 p-6 space-y-3">
           <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Users /> <span>User Database</span></button>
           <button onClick={() => setActiveTab('schedules')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'schedules' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Broadcast /> <span>Schedules</span></button>
           <button onClick={() => setActiveTab('offers')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'offers' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Gift /> <span>Offer Settings</span></button>
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Settings /> <span>System Setup</span></button>
         </nav>
       </aside>
 
@@ -536,6 +550,7 @@ export default function AdminPage() {
         <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center gap-1 ${activeTab === 'users' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Users /> <span className="text-[9px] font-bold uppercase">Users</span></button>
         <button onClick={() => setActiveTab('schedules')} className={`flex flex-col items-center gap-1 ${activeTab === 'schedules' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Broadcast /> <span className="text-[9px] font-bold uppercase">Stream</span></button>
         <button onClick={() => setActiveTab('offers')} className={`flex flex-col items-center gap-1 ${activeTab === 'offers' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Gift /> <span className="text-[9px] font-bold uppercase">Offers</span></button>
+        <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Settings /> <span className="text-[9px] font-bold uppercase">Setup</span></button>
       </nav>
 
       {/* --- MAIN CONTENT AREA --- */}
@@ -543,7 +558,7 @@ export default function AdminPage() {
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 md:mb-12 gap-6">
           <div className="animate-in fade-in slide-in-from-left-4 duration-500">
               <h2 className="text-2xl md:text-4xl font-black text-white mb-2 tracking-tight uppercase">
-                {activeTab === 'users' ? 'Database Access' : activeTab === 'schedules' ? 'Broadcast Nodes' : 'Revenue Config'}
+                {activeTab === 'users' ? 'Database Access' : activeTab === 'schedules' ? 'Broadcast Nodes' : activeTab === 'offers' ? 'Revenue Config' : 'Master Setup'}
               </h2>
               <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.3em]">Administrator privilege active</p>
           </div>
@@ -560,6 +575,7 @@ export default function AdminPage() {
                     <Icons.Upload /> <span className="uppercase text-[10px] tracking-widest hidden sm:inline">Bulk Injection</span>
                 </button>
              )}
+             {activeTab !== 'settings' && (
              <button onClick={() => {
                  if (activeTab === 'users') setShowUserModal(true);
                  else if (activeTab === 'schedules') handleOpenScheduleModal();
@@ -567,6 +583,7 @@ export default function AdminPage() {
              }} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
                 <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
             </button>
+             )}
           </div>
         </header>
 
@@ -625,7 +642,6 @@ export default function AdminPage() {
                     )) : <tr><td colSpan={5} className="p-20 text-center text-gray-700 font-black uppercase tracking-widest text-xs">Zero nodes detected</td></tr>}
                 </tbody>
                 </table>
-                {/* --- PAGINATION (MOBILE FRIENDLY) --- */}
                 <div className="flex flex-col sm:flex-row items-center justify-between p-6 border-t border-white/5 gap-4">
                     <div className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">Matrix: {totalUsers} Entities</div>
                     <div className="flex items-center gap-4">
@@ -638,7 +654,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* --- SCHEDULES VIEW (MOBILE RESPONSIVE GRID) --- */}
+        {/* --- SCHEDULES VIEW --- */}
         {activeTab === 'schedules' && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8 animate-in fade-in duration-500">
             {schedules.map((s) => (
@@ -667,7 +683,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* --- OFFERS VIEW (STRICT MOBILE GRID) --- */}
+        {/* --- OFFERS VIEW --- */}
         {activeTab === 'offers' && (
           <div className="space-y-10 md:space-y-12 animate-in fade-in duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-6 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-10">
@@ -703,14 +719,53 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* --- SYSTEM SETTINGS VIEW --- */}
+        {activeTab === 'settings' && (
+          <div className="max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-10 md:p-12 space-y-12">
+                <div>
+                   <h3 className="text-xl font-black text-white mb-2 tracking-tighter uppercase tracking-[0.1em]">Interaction Node Setup</h3>
+                   <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-8">Override the live chat URL globally across all active broadcast nodes.</p>
+                   <div className="space-y-6">
+                      <div className="space-y-3">
+                         <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Live Chat Embed Source</label>
+                         <input 
+                            type="text" 
+                            value={chatUrl} 
+                            onChange={(e) => setChatUrl(e.target.value)} 
+                            placeholder="https://chat.restream.io/embed?token=..." 
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500 transition-all text-xs"
+                         />
+                      </div>
+                      <button 
+                        onClick={handleSaveChatUrl}
+                        className="bg-yellow-500 text-black px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-yellow-500/10 hover:scale-[1.02] active:scale-95 transition-all"
+                      >
+                         Sync System Link
+                      </button>
+                   </div>
+                </div>
+
+                <div className="pt-10 border-t border-white/5">
+                   <h3 className="text-xl font-black text-white mb-2 tracking-tighter uppercase tracking-[0.1em]">Static Matrix Config</h3>
+                   <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-4">Manual QRIS sync is currently pointing to:</p>
+                   <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                      <code className="text-[9px] text-gray-400 truncate max-w-[70%]">{qrisUrl || 'Unassigned'}</code>
+                      <button onClick={() => setActiveTab('offers')} className="text-[9px] font-black text-yellow-500 uppercase hover:underline">Change Asset</button>
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
       </main>
 
-      {/* --- MODALS (STRICT MOBILE SUPPORT) --- */}
+      {/* --- MODALS --- */}
 
-      {/* MODAL USER (CREATE/EDIT) */}
+      {/* MODAL USER */}
       {(showUserModal || showEditUserModal) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max- Indo w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
                 <button onClick={() => {setShowUserModal(false); setShowEditUserModal(false);}} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all hover:rotate-90"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase">{showEditUserModal ? 'Modify Node' : 'Register Entity'}</h3>
                 <form onSubmit={showEditUserModal ? handleUpdateUser : handleCreateUser} className="space-y-8">
@@ -742,7 +797,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODAL SCHEDULE (MULTI-SERVER) */}
+      {/* MODAL SCHEDULE */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
             <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[2.5rem] md:rounded-[3rem] p-8 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-in zoom-in duration-300">
@@ -761,8 +816,8 @@ export default function AdminPage() {
                           {streamSources.map((src, idx) => (
                             <div key={idx} className="bg-white/[0.02] border border-white/5 p-6 md:p-8 rounded-3xl flex flex-col md:flex-row gap-6 relative group transition-all hover:bg-white/[0.04]">
                                <div className="flex-1 space-y-4">
-                                  <input placeholder="Server Designation (e.g. Node-1)" value={src.name} onChange={e => updateSourceField(idx, 'name', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[11px] font-black py-2 outline-none text-white focus:border-yellow-500" />
-                                  <input placeholder="Matrix URL (YouTube / M3U8)" value={src.url} onChange={e => updateSourceField(idx, 'url', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[9px] py-2 outline-none text-gray-500 focus:border-yellow-500" required />
+                                  <input placeholder="Server Designation" value={src.name} onChange={e => updateSourceField(idx, 'name', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[11px] font-black py-2 outline-none text-white focus:border-yellow-500" />
+                                  <input placeholder="Matrix URL" value={src.url} onChange={e => updateSourceField(idx, 'url', e.target.value)} className="w-full bg-transparent border-b border-white/10 text-[9px] py-2 outline-none text-gray-500 focus:border-yellow-500" required />
                                </div>
                                {streamSources.length > 1 && <button type="button" onClick={() => removeSourceField(idx)} className="text-red-500/30 hover:text-red-500 transition-all self-end md:self-center p-2"><Icons.Trash /></button>}
                             </div>
@@ -770,9 +825,9 @@ export default function AdminPage() {
                         </div>
                     </div>
                     
-                    <div><label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Thumbnail Node Metadata</label><div className="flex gap-4"><input type="text" value={newScheduleThumbnail} onChange={e => setNewScheduleThumbnail(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-5 text-white text-xs outline-none" /><button type="button" onClick={() => {setMediaMode('schedule'); setShowMediaModal(true); fetchMedia();}} className="bg-white/5 text-white px-6 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"><Icons.Image /></button></div></div>
+                    <div><label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Thumbnail Metadata</label><div className="flex gap-4"><input type="text" value={newScheduleThumbnail} onChange={e => setNewScheduleThumbnail(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-5 text-white text-xs outline-none" /><button type="button" onClick={() => {setMediaMode('schedule'); setShowMediaModal(true); fetchMedia();}} className="bg-white/5 text-white px-6 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"><Icons.Image /></button></div></div>
                     
-                    <button type="submit" className="w-full bg-yellow-500 text-black font-black py-6 rounded-3xl uppercase tracking-[0.3em] text-[10px] shadow-2xl shadow-yellow-500/20 hover:scale-[1.02] active:scale-95 transition-all">Synchronize Broadcast Nodes</button>
+                    <button type="submit" className="w-full bg-yellow-500 text-black font-black py-6 rounded-3xl uppercase tracking-[0.3em] text-[10px] shadow-2xl shadow-yellow-500/20 hover:scale-[1.02] transition-all">Synchronize Nodes</button>
                 </form>
             </div>
         </div>
@@ -803,14 +858,14 @@ export default function AdminPage() {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl animate-in fade-in duration-500">
             <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-5xl rounded-[3rem] p-8 md:p-12 relative h-[85vh] flex flex-col shadow-2xl">
                 <button onClick={() => setShowMediaModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white"><Icons.X /></button>
-                <h3 className="text-2xl font-black text-white mb-10 tracking-tighter uppercase tracking-[0.3em]">Matrix Asset Library</h3>
+                <h3 className="text-2xl font-black text-white mb-10 tracking-tighter uppercase tracking-[0.3em]">Asset Library</h3>
                 <div className="mb-10 md:mb-12 p-10 md:p-16 border-2 border-dashed border-white/5 rounded-[3rem] text-center relative bg-white/[0.01] hover:bg-white/[0.03] transition-all group">
                     <input type="file" accept="image/*" onChange={handleUploadMedia} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                     <div className="pointer-events-none flex flex-col items-center">
-                        <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-6 border border-white/10 bg-black transition-all ${uploading ? 'animate-spin border-yellow-500' : 'group-hover:scale-110 group-hover:border-yellow-500/50'}`}>
-                           {uploading ? <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div> : <Icons.Upload />}
+                        <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-6 border border-white/10 bg-black transition-all ${uploading ? 'animate-spin border-yellow-500' : 'group-hover:border-yellow-500/50'}`}>
+                            {uploading ? <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div> : <Icons.Upload />}
                         </div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-gray-600 group-hover:text-yellow-500 transition-colors">{uploading ? 'Transferring Node Assets...' : 'Initialize New Asset Upload'}</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-gray-600 group-hover:text-yellow-500 transition-colors">{uploading ? 'Transferring assets...' : 'Upload New Asset'}</p>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 md:pr-4">
@@ -832,14 +887,14 @@ export default function AdminPage() {
       {/* BULK MODAL */}
       {showBulkModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-lg rounded-[3rem] p-10 md:p-12 relative shadow-2xl animate-in zoom-in duration-300">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-lg rounded-[3rem] p-10 md:p-12 relative shadow-2xl animate-in zoom-in duration-300">
                 <button onClick={() => setShowBulkModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white"><Icons.X /></button>
-                <h3 className="text-2xl font-black text-white mb-3 tracking-tighter uppercase tracking-widest">Mass Node Injection</h3>
+                <h3 className="text-2xl font-black text-white mb-3 tracking-tighter uppercase">Mass Injection</h3>
                 <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-10">Matrix delimiters: \n or comma (,)</p>
                 <form onSubmit={handleBulkImport} className="space-y-8">
-                    <div><label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Batch Duration Offset</label><input type="number" value={bulkDuration} onChange={(e) => setBulkDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500" required /></div>
-                    <textarea className="w-full h-64 bg-white/5 border border-white/10 rounded-[2.5rem] p-8 text-white text-[11px] font-mono outline-none focus:border-yellow-500 transition-all custom-scrollbar" placeholder="entity_01@node.com&#10;entity_02@node.com" value={bulkText} onChange={(e) => setBulkText(e.target.value)} required />
-                    <button type="submit" disabled={bulkLoading} className="w-full bg-white text-black font-black py-6 rounded-3xl hover:bg-yellow-500 transition-all uppercase text-[10px] tracking-[0.3em] disabled:opacity-30 shadow-xl">{bulkLoading ? 'Processing Matrix Nodes...' : 'Execute Mass Injection'}</button>
+                    <div><label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Duration Offset</label><input type="number" value={bulkDuration} onChange={(e) => setBulkDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500" required /></div>
+                    <textarea className="w-full h-64 bg-white/5 border border-white/10 rounded-[2.5rem] p-8 text-white text-[11px] font-mono outline-none focus:border-yellow-500 transition-all custom-scrollbar" placeholder="email@node.com, email2@node.com" value={bulkText} onChange={(e) => setBulkText(e.target.value)} required />
+                    <button type="submit" disabled={bulkLoading} className="w-full bg-white text-black font-black py-6 rounded-3xl hover:bg-yellow-500 transition-all uppercase text-[10px] tracking-[0.3em] disabled:opacity-30 shadow-xl">{bulkLoading ? 'Processing...' : 'Execute Injection'}</button>
                 </form>
             </div>
         </div>
@@ -852,7 +907,6 @@ export default function AdminPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444; }
         input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; opacity: 0.5; }
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
