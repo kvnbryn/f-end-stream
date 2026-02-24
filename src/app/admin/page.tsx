@@ -154,7 +154,7 @@ export default function AdminPage() {
 
   // [HELPER PERMISSION]
   const checkPermission = (action: string) => {
-    const restricted = ['offers', 'links', 'settings', 'manage_packages', 'manage_links', 'system_setup'];
+    const restricted = ['offers', 'links', 'settings', 'manage_packages', 'manage_links', 'system_setup', 'modify_schedule'];
     if (role !== 'SUPERADMIN' && restricted.includes(action)) {
       alert("⚠️ Izin Ditolak: Fitur ini hanya tersedia untuk Superadmin!");
       return false;
@@ -172,6 +172,13 @@ export default function AdminPage() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  // [FIX LOGOUT BLACK SCREEN]
+  useEffect(() => {
+    if (!isLoading && !token) {
+      router.push('/login');
+    }
+  }, [isLoading, token, router]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -259,14 +266,16 @@ export default function AdminPage() {
   const handleBulkDelete = async () => {
       if (!confirm(`Hapus ${selectedUserIds.size} user?`)) return;
       try {
-          await fetch(`${backendUrl}/api/v1/admin/users/bulk`, {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/bulk`, {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ ids: Array.from(selectedUserIds) })
           });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
           showToast('Users deleted', 'success');
           fetchUsers();
-      } catch (e) { showToast('Gagal hapus massal', 'error'); }
+      } catch (e: any) { showToast(e.message, 'error'); }
   };
 
   const handleApproveClick = (user: User) => {
@@ -300,20 +309,31 @@ export default function AdminPage() {
   };
 
   const handleEditUserClick = (user: User) => {
+      // Admin tidak boleh edit Superadmin (Cek di UI juga)
+      if (user.role === 'SUPERADMIN' && role !== 'SUPERADMIN') {
+        alert("⚠️ Izin Ditolak: Anda tidak boleh mengedit akun Superadmin!");
+        return;
+      }
       setEditingUser(user);
       setUserFormEmail(user.email);
       setUserFormDuration(0);
       setShowEditUserModal(true);
   };
 
-  const handleDeleteUser = async (id: string) => {
-      if(!confirm('Hapus user selamanya?')) return;
+  const handleDeleteUser = async (user: User) => {
+      if (user.role === 'SUPERADMIN') {
+        alert("⚠️ Larangan Keras: Akun Superadmin tidak bisa dihapus!");
+        return;
+      }
+      if(!confirm(`Hapus user ${user.email} selamanya?`)) return;
       try {
-          const res = await fetch(`${backendUrl}/api/v1/admin/users/${id}`, {
+          const res = await fetch(`${backendUrl}/api/v1/admin/users/${user.id}`, {
               method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
           });
-          if(res.ok) { showToast('Deleted!', 'success'); fetchUsers(); }
-      } catch (e) { showToast('Gagal hapus', 'error'); }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          showToast('Deleted!', 'success'); fetchUsers();
+      } catch (e: any) { showToast(e.message, 'error'); }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -337,8 +357,10 @@ export default function AdminPage() {
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: userFormEmail, durationDays: Number(userFormDuration) || undefined })
           });
-          if(res.ok) { showToast('User Updated!', 'success'); setShowEditUserModal(false); fetchUsers(); }
-      } catch (e) { showToast('Gagal update', 'error'); }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          showToast('User Updated!', 'success'); setShowEditUserModal(false); fetchUsers();
+      } catch (e: any) { showToast(e.message, 'error'); }
   };
 
   const handleBulkImport = async (e: React.FormEvent) => {
@@ -391,6 +413,7 @@ export default function AdminPage() {
 
   // --- ACTIONS: SCHEDULE ---
   const handleOpenScheduleModal = (s?: Schedule) => {
+    if (!checkPermission('modify_schedule')) return;
     if (s) {
       setEditingSchedule(s);
       setNewScheduleTitle(s.title);
@@ -439,6 +462,7 @@ export default function AdminPage() {
   };
 
   const handleDeleteSchedule = async (id: string) => {
+      if (!checkPermission('modify_schedule')) return;
       if(!confirm('Hapus jadwal ini?')) return;
       try {
           const res = await fetch(`${backendUrl}/api/v1/admin/schedules/${id}`, {
@@ -664,7 +688,9 @@ export default function AdminPage() {
                 <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
             </button>
              )}
-             {activeTab === 'schedules' && (
+             
+             {/* [FIX: SEMBUNYIKAN NEW NODE SCHEDULE BUAT ADMIN] */}
+             {activeTab === 'schedules' && role === 'SUPERADMIN' && (
              <button onClick={() => handleOpenScheduleModal()} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
                 <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
             </button>
@@ -717,8 +743,8 @@ export default function AdminPage() {
                                         <button onClick={() => handleApproveClick(u)} className="bg-green-500 text-black px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-transform">Authorize</button>
                                     ) : (
                                         <div className="flex gap-2.5 text-gray-600">
-                                            <button onClick={() => handleEditUserClick(u)} className="hover:text-yellow-500 transition-colors"><Icons.Edit /></button>
-                                            <button onClick={() => handleDeleteUser(u.id)} className="hover:text-red-500 transition-colors"><Icons.Trash /></button>
+                                            <button onClick={() => handleEditUserClick(u)} className={`transition-colors ${u.role === 'SUPERADMIN' && role !== 'SUPERADMIN' ? 'opacity-20 cursor-not-allowed' : 'hover:text-yellow-500'}`}><Icons.Edit /></button>
+                                            <button onClick={() => handleDeleteUser(u)} className={`transition-colors ${u.role === 'SUPERADMIN' ? 'opacity-20 cursor-not-allowed' : 'hover:text-red-500'}`}><Icons.Trash /></button>
                                         </div>
                                     )}
                                 </div>
@@ -751,10 +777,14 @@ export default function AdminPage() {
                 <div className="flex-1 flex flex-col justify-between">
                    <div className="flex justify-between items-start mb-4 gap-2">
                       <h3 className="text-lg md:text-xl font-black text-white leading-tight uppercase tracking-tight line-clamp-2">{s.title}</h3>
+                      
+                      {/* [FIX: SEMBUNYIKAN EDIT/TRASH STREAM BUAT ADMIN] */}
+                      {role === 'SUPERADMIN' && (
                       <div className="flex gap-2.5 shrink-0 pt-1">
                         <button onClick={() => handleOpenScheduleModal(s)} className="text-gray-600 hover:text-yellow-500 transition-colors"><Icons.Edit /></button>
                         <button onClick={() => handleDeleteSchedule(s.id)} className="text-gray-600 hover:text-red-500 transition-colors"><Icons.Trash /></button>
                       </div>
+                      )}
                    </div>
                    <div className="space-y-2 mb-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                       <p className="flex items-center gap-2">📅 {new Date(s.start_time).toLocaleString()}</p>
