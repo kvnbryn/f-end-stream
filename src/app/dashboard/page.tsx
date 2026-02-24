@@ -8,12 +8,13 @@ import { io, Socket } from 'socket.io-client';
 import { getBackendUrl } from '@/lib/config'; 
 import Cookies from 'js-cookie';
 
+// --- ICON COMPONENTS (Matrix Style) ---
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
   Film: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="7" x2="7" y1="3" y2="21"/><line x1="17" x2="17" y1="3" y2="21"/><line x1="3" x2="21" y1="12" y2="12"/></svg>,
   Message: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+  Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
 };
 
 export default function DashboardPage() {
@@ -26,15 +27,15 @@ export default function DashboardPage() {
   const [isSpecialLink, setIsSpecialLink] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [chatUrl, setChatUrl] = useState(''); 
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null); 
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
 
-  // Ambil special token jika ada
+  // Ambil special token dari cookies jika user masuk via link khusus
   const specialToken = Cookies.get('special_token');
 
   useEffect(() => {
-    // Redirect ke login hanya jika TIDAK ADA token email DAN TIDAK ADA special link
+    // Redirect ke login kalau nggak ada token email dan nggak ada special link
     if (!isLoading && !token && !specialToken) {
       router.push('/login');
     }
@@ -60,26 +61,32 @@ export default function DashboardPage() {
   const fetchStreamData = async () => {
     try {
       let res;
-      // Jika login via email (token ada)
-      if (token) {
-        res = await fetch(`${backendUrl}/api/v1/stream/current`, { headers: { 'Authorization': `Bearer ${token}` } });
-      } 
-      // Jika masuk via link (specialToken ada)
-      else if (specialToken) {
-        setIsSpecialLink(true);
+      let isLinkAccess = false;
+
+      // 1. Cek dulu apakah pakai Link Khusus (prioritas)
+      if (specialToken) {
+        isLinkAccess = true;
         res = await fetch(`${backendUrl}/api/v1/public/access/verify/${specialToken}`);
+      } 
+      // 2. Jika tidak, cek apakah pakai Login Email biasa
+      else if (token) {
+        res = await fetch(`${backendUrl}/api/v1/stream/current`, { headers: { 'Authorization': `Bearer ${token}` } });
       } else {
         return;
       }
 
       const data = await res.json();
       
-      // Khusus untuk link verifikasi, backend return { valid, stream }
-      const finalStream = data.stream || data; 
-      const isValid = token ? res.ok : data.valid;
+      // Ambil data stream yang bener tergantung method aksesnya
+      const finalStream = isLinkAccess ? data.stream : data;
+      const isValid = isLinkAccess ? data.valid : res.ok;
 
-      if (!isValid || !finalStream) throw new Error('OFFLINE');
+      // Jika data tidak valid, stream kosong, atau ada pesan offline dari backend
+      if (!isValid || !finalStream || finalStream.message === 'Offline') {
+        throw new Error('OFFLINE');
+      }
 
+      setIsSpecialLink(isLinkAccess);
       setStreamData(finalStream);
       setError('');
       
@@ -89,7 +96,7 @@ export default function DashboardPage() {
       
     } catch (err: any) {
       setStreamData(null); 
-      setError(err.message === 'OFFLINE' ? 'OFFLINE' : err.message);
+      setError('OFFLINE');
     }
   };
 
@@ -128,7 +135,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (chatUrl && chatUrl.includes('<script') && chatContainerRef.current) {
         const container = chatContainerRef.current;
-        container.innerHTML = '';
+        container.innerHTML = ''; 
         const range = document.createRange();
         const fragment = range.createContextualFragment(chatUrl);
         container.appendChild(fragment);
@@ -152,13 +159,15 @@ export default function DashboardPage() {
       <header className="h-14 px-4 md:px-6 flex justify-between items-center bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
         <div className="flex items-center gap-4">
             <h1 className="text-base font-black tracking-tighter text-yellow-500 uppercase">Realtime<span className="text-white">48</span></h1>
+            
+            {/* Indikator Status Login (Email vs Link) */}
             {daysLeft !== null && !isSpecialLink && (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-black text-yellow-500 tracking-widest uppercase">
                    <Icons.Crown /> {daysLeft} Days Access
                 </div>
             )}
             {isSpecialLink && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-500 tracking-widest uppercase">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-500 tracking-widest uppercase animate-in fade-in zoom-in duration-500">
                    <Icons.Link /> VIP Link Access
                 </div>
             )}
@@ -173,12 +182,14 @@ export default function DashboardPage() {
       {/* VIEWPORT */}
       <main className="flex-1 min-h-0 w-full flex items-center justify-center p-2 md:p-3 lg:p-4">
         <div className="w-full max-w-[1750px] h-full flex flex-col lg:flex-row gap-3 lg:items-stretch">
+          
           <div className="flex-[2.8] flex flex-col gap-3 min-h-0 h-full">
             {streamData && !countdown ? (
               <>
                 <div className="flex-1 min-h-0 relative bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl">
                   <VideoPlayer sources={streamData.sources || []} activeSourceIndex={activeSourceIdx} onSwitchSource={(idx) => setActiveSourceIdx(idx)} poster={streamData.thumbnail} />
                 </div>
+                
                 <div className="h-[60px] shrink-0 bg-[#0a0a0a] px-5 flex items-center justify-between rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
@@ -188,6 +199,7 @@ export default function DashboardPage() {
                        <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
                     </div>
                   </div>
+
                   <div className="flex items-center gap-2 ml-4">
                     {streamData.sources?.map((src: any, idx: number) => (
                       <button
@@ -217,6 +229,7 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* DYNAMIC CHAT SECTION */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -226,9 +239,16 @@ export default function DashboardPage() {
                <div className="flex-1 relative bg-black/20 overflow-hidden">
                   {chatUrl ? (
                     !chatUrl.includes('<script') ? (
-                        <iframe src={chatUrl} className="absolute inset-0 w-full h-full border-0" title="Live Chat"></iframe>
+                        <iframe 
+                          src={chatUrl} 
+                          className="absolute inset-0 w-full h-full border-0"
+                          title="Live Chat"
+                        ></iframe>
                     ) : (
-                        <div ref={chatContainerRef} className="absolute inset-0 w-full h-full flex items-center justify-center p-2"></div>
+                        <div 
+                           ref={chatContainerRef} 
+                           className="absolute inset-0 w-full h-full flex items-center justify-center p-2"
+                        ></div>
                     )
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20">
