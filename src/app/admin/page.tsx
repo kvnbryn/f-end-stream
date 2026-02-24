@@ -50,6 +50,16 @@ type Package = {
     image_url?: string; 
 };
 
+// [NEW TYPE]
+type SpecialAccess = {
+    id: string;
+    token: string;
+    label: string | null;
+    is_active: boolean;
+    expires_at: string | null;
+    created_at: string;
+};
+
 // --- ICON COMPONENTS ---
 const Icons = {
   Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
@@ -68,6 +78,8 @@ const Icons = {
   Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
   Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
   Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+  Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
 };
 
 export default function AdminPage() {
@@ -76,7 +88,7 @@ export default function AdminPage() {
   const backendUrl = getBackendUrl();
   
   // --- NAVIGATION STATE ---
-  const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers' | 'settings'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'schedules' | 'offers' | 'links' | 'settings'>('users');
   
   // --- USERS DATA STATE ---
   const [users, setUsers] = useState<User[]>([]);
@@ -92,6 +104,7 @@ export default function AdminPage() {
   // --- GLOBAL DATA STATE ---
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [specialLinks, setSpecialLinks] = useState<SpecialAccess[]>([]);
   const [qrisUrl, setQrisUrl] = useState('');
   const [chatUrl, setChatUrl] = useState('');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -136,6 +149,10 @@ export default function AdminPage() {
   const [pkgStock, setPkgStock] = useState('');
   const [pkgImage, setPkgImage] = useState('');
 
+  // [NEW FORM STATE]
+  const [linkLabel, setLinkLabel] = useState('');
+  const [linkDuration, setLinkDuration] = useState('1');
+
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -176,11 +193,13 @@ export default function AdminPage() {
   const fetchGlobalData = async () => {
      if (!token) return;
      try {
-         const [resSched, resPkg] = await Promise.all([
+         const [resSched, resPkg, resLinks] = await Promise.all([
              fetch(`${backendUrl}/api/v1/admin/schedules`, { headers: { 'Authorization': `Bearer ${token}` } }),
-             fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } })
+             fetch(`${backendUrl}/api/v1/admin/packages`, { headers: { 'Authorization': `Bearer ${token}` } }),
+             fetch(`${backendUrl}/api/v1/admin/access`, { headers: { 'Authorization': `Bearer ${token}` } })
          ]);
          if(resSched.ok) setSchedules(await resSched.json());
+         if(resLinks.ok) setSpecialLinks(await resLinks.json());
          if(resPkg.ok) {
              const data = await resPkg.json();
              setPackages(data.packages);
@@ -513,6 +532,41 @@ export default function AdminPage() {
     setShowMediaModal(false);
   };
 
+  // [NEW ACTIONS: SPECIAL ACCESS LINKS]
+  const handleGenerateLink = async () => {
+    try {
+        const res = await fetch(`${backendUrl}/api/v1/admin/access/generate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                label: linkLabel, 
+                durationDays: linkDuration === '0' ? null : Number(linkDuration) 
+            })
+        });
+        if (res.ok) {
+            showToast('Access Link Injected!', 'success');
+            setLinkLabel('');
+            fetchGlobalData();
+        }
+    } catch (e) { showToast('Gagal generate link', 'error'); }
+  };
+
+  const handleDeleteLink = async (id: string) => {
+    if(!confirm('Purge this access link?')) return;
+    try {
+        await fetch(`${backendUrl}/api/v1/admin/access/${id}`, {
+            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+        });
+        fetchGlobalData();
+    } catch (e) { showToast('Gagal hapus', 'error'); }
+  };
+
+  const copyToClipboard = (token: string) => {
+    const url = `${window.location.origin}/watch/${token}`;
+    navigator.clipboard.writeText(url);
+    showToast('Link Copied to Matrix!', 'success');
+  };
+
   if (isLoading || !token) return <div className="min-h-screen bg-black" />;
 
   return (
@@ -541,6 +595,7 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Users /> <span>User Database</span></button>
           <button onClick={() => setActiveTab('schedules')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'schedules' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Broadcast /> <span>Schedules</span></button>
           <button onClick={() => setActiveTab('offers')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'offers' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Gift /> <span>Offer Settings</span></button>
+          <button onClick={() => setActiveTab('links')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'links' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Link /> <span>Access Links</span></button>
           <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Settings /> <span>System Setup</span></button>
         </nav>
       </aside>
@@ -550,6 +605,7 @@ export default function AdminPage() {
         <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center gap-1 ${activeTab === 'users' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Users /> <span className="text-[9px] font-bold uppercase">Users</span></button>
         <button onClick={() => setActiveTab('schedules')} className={`flex flex-col items-center gap-1 ${activeTab === 'schedules' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Broadcast /> <span className="text-[9px] font-bold uppercase">Stream</span></button>
         <button onClick={() => setActiveTab('offers')} className={`flex flex-col items-center gap-1 ${activeTab === 'offers' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Gift /> <span className="text-[9px] font-bold uppercase">Offers</span></button>
+        <button onClick={() => setActiveTab('links')} className={`flex flex-col items-center gap-1 ${activeTab === 'links' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Link /> <span className="text-[9px] font-bold uppercase">Links</span></button>
         <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Settings /> <span className="text-[9px] font-bold uppercase">Setup</span></button>
       </nav>
 
@@ -558,7 +614,7 @@ export default function AdminPage() {
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 md:mb-12 gap-6">
           <div className="animate-in fade-in slide-in-from-left-4 duration-500">
               <h2 className="text-2xl md:text-4xl font-black text-white mb-2 tracking-tight uppercase">
-                {activeTab === 'users' ? 'Database Access' : activeTab === 'schedules' ? 'Broadcast Nodes' : activeTab === 'offers' ? 'Revenue Config' : 'Master Setup'}
+                {activeTab === 'users' ? 'Database Access' : activeTab === 'schedules' ? 'Broadcast Nodes' : activeTab === 'offers' ? 'Revenue Config' : activeTab === 'links' ? 'VIP Access Nodes' : 'Master Setup'}
               </h2>
               <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.3em]">Administrator privilege active</p>
           </div>
@@ -575,7 +631,7 @@ export default function AdminPage() {
                     <Icons.Upload /> <span className="uppercase text-[10px] tracking-widest hidden sm:inline">Bulk Injection</span>
                 </button>
              )}
-             {activeTab !== 'settings' && (
+             {(activeTab !== 'settings' && activeTab !== 'links') && (
              <button onClick={() => {
                  if (activeTab === 'users') setShowUserModal(true);
                  else if (activeTab === 'schedules') handleOpenScheduleModal();
@@ -717,6 +773,70 @@ export default function AdminPage() {
                  </div>
                ))}
             </div>
+          </div>
+        )}
+
+        {/* --- ACCESS LINKS VIEW (NEW TAB) --- */}
+        {activeTab === 'links' && (
+          <div className="space-y-10 animate-in fade-in duration-500">
+             <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-8 md:p-12 shadow-2xl">
+                <h3 className="text-xl font-black text-white mb-2 tracking-tighter uppercase tracking-[0.1em]">Access Node Injection</h3>
+                <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-10">Generate unique bypass tokens for VIP nodes.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Node Designation</label>
+                      <input type="text" value={linkLabel} onChange={e => setLinkLabel(e.target.value)} placeholder="Node Name (e.g. VIP-GUEST)" className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500 text-xs" />
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Transmission Life</label>
+                      <select value={linkDuration} onChange={e => setLinkDuration(e.target.value)} className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500 text-xs appearance-none">
+                         <option value="1">24 HOURS LIFE</option>
+                         <option value="7">1 WEEK LIFE</option>
+                         <option value="30">1 MONTH LIFE</option>
+                         <option value="0">PERMANENT NODE</option>
+                      </select>
+                   </div>
+                   <div className="flex items-end">
+                      <button onClick={handleGenerateLink} className="w-full bg-yellow-500 text-black px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-yellow-500/10 hover:scale-[1.02] active:scale-95 transition-all">Inject New Node</button>
+                   </div>
+                </div>
+             </div>
+
+             <div className="overflow-x-auto rounded-[2.5rem] border border-white/5 bg-[#0a0a0a] shadow-2xl">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-white/5 text-gray-500 uppercase tracking-[0.2em] text-[9px] font-black">
+                    <tr>
+                        <th className="p-8">Designation</th>
+                        <th className="p-8">Node Life</th>
+                        <th className="p-8 text-right">Ops</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                    {specialLinks.map((link) => (
+                        <tr key={link.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="p-8">
+                                <div className="font-bold text-white mb-1 uppercase tracking-tight">{link.label || 'UNKNOWN NODE'}</div>
+                                <div className="text-[9px] text-gray-600 font-mono">{link.token}</div>
+                            </td>
+                            <td className="p-8">
+                                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black border uppercase tracking-widest ${!link.expires_at ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
+                                    {link.expires_at ? `Expires: ${new Date(link.expires_at).toLocaleDateString()}` : 'Permanent Access'}
+                                </span>
+                            </td>
+                            <td className="p-8 text-right">
+                                <div className="flex justify-end gap-4">
+                                    <button onClick={() => copyToClipboard(link.token)} className="p-3 bg-white/5 text-gray-400 hover:text-yellow-500 rounded-2xl border border-white/5 transition-all"><Icons.Copy /></button>
+                                    <button onClick={() => handleDeleteLink(link.id)} className="p-3 bg-white/5 text-gray-400 hover:text-red-500 rounded-2xl border border-white/5 transition-all"><Icons.Trash /></button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                    {specialLinks.length === 0 && (
+                        <tr><td colSpan={3} className="p-20 text-center text-gray-700 font-black uppercase tracking-widest text-[10px]">No active VIP access nodes</td></tr>
+                    )}
+                </tbody>
+                </table>
+             </div>
           </div>
         )}
 
