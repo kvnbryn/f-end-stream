@@ -6,12 +6,14 @@ import VideoPlayer from '@/components/VideoPlayer';
 import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client'; 
 import { getBackendUrl } from '@/lib/config'; 
+import Cookies from 'js-cookie';
 
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
   Film: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="7" x2="7" y1="3" y2="21"/><line x1="17" x2="17" y1="3" y2="21"/><line x1="3" x2="21" y1="12" y2="12"/></svg>,
-  Message: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  Message: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
 };
 
 export default function DashboardPage() {
@@ -21,15 +23,22 @@ export default function DashboardPage() {
   const [activeSourceIdx, setActiveSourceIdx] = useState(0);
   const [error, setError] = useState('');
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [isSpecialLink, setIsSpecialLink] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [chatUrl, setChatUrl] = useState(''); 
-  const chatContainerRef = useRef<HTMLDivElement>(null); // REF UNTUK INJEKSI SCRIPT
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
 
+  // Ambil special token jika ada
+  const specialToken = Cookies.get('special_token');
+
   useEffect(() => {
-    if (!isLoading && !token) router.push('/login');
-  }, [isLoading, token, router]);
+    // Redirect ke login hanya jika TIDAK ADA token email DAN TIDAK ADA special link
+    if (!isLoading && !token && !specialToken) {
+      router.push('/login');
+    }
+  }, [isLoading, token, specialToken, router]);
 
   const fetchGlobalConfig = async () => {
     try {
@@ -49,16 +58,35 @@ export default function DashboardPage() {
   };
 
   const fetchStreamData = async () => {
-    if (!token) return; 
     try {
-      const res = await fetch(`${backendUrl}/api/v1/stream/current`, { headers: { 'Authorization': `Bearer ${token}` } });
+      let res;
+      // Jika login via email (token ada)
+      if (token) {
+        res = await fetch(`${backendUrl}/api/v1/stream/current`, { headers: { 'Authorization': `Bearer ${token}` } });
+      } 
+      // Jika masuk via link (specialToken ada)
+      else if (specialToken) {
+        setIsSpecialLink(true);
+        res = await fetch(`${backendUrl}/api/v1/public/access/verify/${specialToken}`);
+      } else {
+        return;
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error('OFFLINE');
-      setStreamData(data);
+      
+      // Khusus untuk link verifikasi, backend return { valid, stream }
+      const finalStream = data.stream || data; 
+      const isValid = token ? res.ok : data.valid;
+
+      if (!isValid || !finalStream) throw new Error('OFFLINE');
+
+      setStreamData(finalStream);
       setError('');
-      const startTime = new Date(data.start_time);
+      
+      const startTime = new Date(finalStream.start_time);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       if (new Date() < startTime) startCountdown(startTime); else setCountdown('');
+      
     } catch (err: any) {
       setStreamData(null); 
       setError(err.message === 'OFFLINE' ? 'OFFLINE' : err.message);
@@ -84,8 +112,8 @@ export default function DashboardPage() {
   };
   
   useEffect(() => {
-    if (!isLoading && token) {
-      fetchUserData(); 
+    if (!isLoading && (token || specialToken)) {
+      if (token) fetchUserData(); 
       fetchStreamData();
       fetchGlobalConfig();
       const socket: Socket = io(backendUrl);
@@ -95,20 +123,26 @@ export default function DashboardPage() {
         socket.disconnect(); 
       };
     }
-  }, [isLoading, token, backendUrl]); 
+  }, [isLoading, token, specialToken, backendUrl]); 
 
-  // LOGIKA PINTAR: EKSEKUSI SCRIPT JIKA INPUTNYA <SCRIPT>
   useEffect(() => {
     if (chatUrl && chatUrl.includes('<script') && chatContainerRef.current) {
         const container = chatContainerRef.current;
-        container.innerHTML = ''; // Bersihkan kontainer
-        
-        // Gunakan Range untuk memaksa script luar dieksekusi di DOM
+        container.innerHTML = '';
         const range = document.createRange();
         const fragment = range.createContextualFragment(chatUrl);
         container.appendChild(fragment);
     }
   }, [chatUrl]);
+
+  const handleLogout = () => {
+    if (specialToken) {
+      Cookies.remove('special_token');
+      router.push('/login');
+    } else {
+      logout();
+    }
+  };
 
   if (isLoading) return <div className="h-screen bg-black" />;
 
@@ -118,30 +152,33 @@ export default function DashboardPage() {
       <header className="h-14 px-4 md:px-6 flex justify-between items-center bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
         <div className="flex items-center gap-4">
             <h1 className="text-base font-black tracking-tighter text-yellow-500 uppercase">Realtime<span className="text-white">48</span></h1>
-            {daysLeft !== null && (
+            {daysLeft !== null && !isSpecialLink && (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-black text-yellow-500 tracking-widest uppercase">
                    <Icons.Crown /> {daysLeft} Days Access
+                </div>
+            )}
+            {isSpecialLink && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-500 tracking-widest uppercase">
+                   <Icons.Link /> VIP Link Access
                 </div>
             )}
         </div>
         <div className="flex items-center gap-2 md:gap-4">
           <a href="https://realtime48show.my.id/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-gray-300 transition-all uppercase tracking-widest"><Icons.Film /> <span className="hidden sm:inline">Replay</span></a>
           {role === 'ADMIN' && (<button onClick={() => router.push('/admin')} className="hidden md:block text-[9px] font-black text-gray-500 hover:text-yellow-500 uppercase tracking-widest transition-colors">Admin</button>)}
-          <button onClick={logout} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white text-gray-400 transition-all border border-white/5"><Icons.Logout /></button>
+          <button onClick={handleLogout} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white text-gray-400 transition-all border border-white/5"><Icons.Logout /></button>
         </div>
       </header>
 
       {/* VIEWPORT */}
       <main className="flex-1 min-h-0 w-full flex items-center justify-center p-2 md:p-3 lg:p-4">
         <div className="w-full max-w-[1750px] h-full flex flex-col lg:flex-row gap-3 lg:items-stretch">
-          
           <div className="flex-[2.8] flex flex-col gap-3 min-h-0 h-full">
             {streamData && !countdown ? (
               <>
                 <div className="flex-1 min-h-0 relative bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl">
                   <VideoPlayer sources={streamData.sources || []} activeSourceIndex={activeSourceIdx} onSwitchSource={(idx) => setActiveSourceIdx(idx)} poster={streamData.thumbnail} />
                 </div>
-                
                 <div className="h-[60px] shrink-0 bg-[#0a0a0a] px-5 flex items-center justify-between rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
@@ -151,7 +188,6 @@ export default function DashboardPage() {
                        <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2 ml-4">
                     {streamData.sources?.map((src: any, idx: number) => (
                       <button
@@ -181,7 +217,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* DYNAMIC CHAT SECTION */}
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
@@ -190,20 +225,10 @@ export default function DashboardPage() {
                </div>
                <div className="flex-1 relative bg-black/20 overflow-hidden">
                   {chatUrl ? (
-                    // CEK APAKAH INPUT ADALAH URL ATAU SCRIPT TAG
                     !chatUrl.includes('<script') ? (
-                        <iframe 
-                          src={chatUrl} 
-                          className="absolute inset-0 w-full h-full border-0"
-                          title="Live Chat"
-                        ></iframe>
+                        <iframe src={chatUrl} className="absolute inset-0 w-full h-full border-0" title="Live Chat"></iframe>
                     ) : (
-                        <div 
-                           ref={chatContainerRef} 
-                           className="absolute inset-0 w-full h-full flex items-center justify-center p-2"
-                        >
-                            {/* Script tag akan diinjeksi di sini oleh useEffect */}
-                        </div>
+                        <div ref={chatContainerRef} className="absolute inset-0 w-full h-full flex items-center justify-center p-2"></div>
                     )
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 grayscale opacity-20">
