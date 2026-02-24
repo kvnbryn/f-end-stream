@@ -50,7 +50,6 @@ type Package = {
     image_url?: string; 
 };
 
-// [NEW TYPE]
 type SpecialAccess = {
     id: string;
     token: string;
@@ -152,6 +151,22 @@ export default function AdminPage() {
   // [NEW FORM STATE]
   const [linkLabel, setLinkLabel] = useState('');
   const [linkDuration, setLinkDuration] = useState('1');
+
+  // [HELPER PERMISSION]
+  const checkPermission = (action: string) => {
+    const restricted = ['offers', 'links', 'settings', 'manage_packages', 'manage_links', 'system_setup'];
+    if (role !== 'SUPERADMIN' && restricted.includes(action)) {
+      alert("⚠️ Izin Ditolak: Fitur ini hanya tersedia untuk Superadmin!");
+      return false;
+    }
+    return true;
+  };
+
+  const handleTabChange = (tab: any) => {
+    if (checkPermission(tab)) {
+      setActiveTab(tab);
+    }
+  };
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
@@ -346,6 +361,7 @@ export default function AdminPage() {
 
   // --- SETTINGS ACTIONS ---
   const handleSaveChatUrl = async () => {
+    if (!checkPermission('system_setup')) return;
     try {
         const res = await fetch(`${backendUrl}/api/v1/admin/settings/chat`, {
             method: 'POST',
@@ -444,6 +460,7 @@ export default function AdminPage() {
 
   // --- ACTIONS: PACKAGE ---
   const handleOpenPackageModal = (pkg?: Package) => {
+      if (!checkPermission('manage_packages')) return;
       if (pkg) {
           setEditingPackage(pkg);
           setPkgTitle(pkg.title);
@@ -476,6 +493,7 @@ export default function AdminPage() {
   };
 
   const handleTogglePackageStatus = async (pkg: Package) => {
+    if (!checkPermission('manage_packages')) return;
     try {
         await fetch(`${backendUrl}/api/v1/admin/packages/${pkg.id}`, {
           method: 'PUT',
@@ -487,6 +505,7 @@ export default function AdminPage() {
   };
 
   const handleDeletePackage = async (id: string) => {
+    if (!checkPermission('manage_packages')) return;
     if(!confirm('Hapus paket?')) return;
     try {
         await fetch(`${backendUrl}/api/v1/admin/packages/${id}`, {
@@ -534,6 +553,7 @@ export default function AdminPage() {
 
   // [NEW ACTIONS: SPECIAL ACCESS LINKS]
   const handleGenerateLink = async () => {
+    if (!checkPermission('manage_links')) return;
     try {
         const res = await fetch(`${backendUrl}/api/v1/admin/access/generate`, {
             method: 'POST',
@@ -552,6 +572,7 @@ export default function AdminPage() {
   };
 
   const handleDeleteLink = async (id: string) => {
+    if (!checkPermission('manage_links')) return;
     if(!confirm('Purge this access link?')) return;
     try {
         await fetch(`${backendUrl}/api/v1/admin/access/${id}`, {
@@ -578,6 +599,9 @@ export default function AdminPage() {
             <h1 className="text-lg font-black tracking-tighter text-yellow-500 uppercase">
               Control<span className="text-white">Center</span>
             </h1>
+            <span className="text-[10px] font-black bg-white/5 px-3 py-1 rounded-full border border-white/10 uppercase tracking-widest text-gray-400">
+              Role: <span className={role === 'SUPERADMIN' ? 'text-yellow-500' : 'text-blue-500'}>{role}</span>
+            </span>
         </div>
         <div className="flex items-center gap-4">
             <button onClick={() => router.push('/dashboard')} className="hidden md:block text-[10px] font-black text-gray-500 hover:text-white transition-colors uppercase tracking-widest">
@@ -592,21 +616,23 @@ export default function AdminPage() {
       {/* --- SIDEBAR --- */}
       <aside className="hidden md:flex w-64 flex-col border-r border-white/5 bg-black/50 backdrop-blur-xl fixed h-screen top-16 z-50">
         <nav className="flex-1 p-6 space-y-3">
-          <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Users /> <span>User Database</span></button>
-          <button onClick={() => setActiveTab('schedules')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'schedules' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Broadcast /> <span>Schedules</span></button>
-          <button onClick={() => setActiveTab('offers')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'offers' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Gift /> <span>Offer Settings</span></button>
-          <button onClick={() => setActiveTab('links')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'links' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Link /> <span>Access Links</span></button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Settings /> <span>System Setup</span></button>
+          <button onClick={() => handleTabChange('users')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Users /> <span>User Database</span></button>
+          <button onClick={() => handleTabChange('schedules')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'schedules' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Broadcast /> <span>Schedules</span></button>
+          
+          {/* Restricted Tabs */}
+          <button onClick={() => handleTabChange('offers')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'offers' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Gift /> <span>Offer Settings</span></button>
+          <button onClick={() => handleTabChange('links')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'links' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Link /> <span>Access Links</span></button>
+          <button onClick={() => handleTabChange('settings')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Settings /> <span>System Setup</span></button>
         </nav>
       </aside>
 
       {/* --- BOTTOM NAVIGATION (MOBILE) --- */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-xl border-t border-white/5 flex items-center justify-around z-[60] px-2">
-        <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center gap-1 ${activeTab === 'users' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Users /> <span className="text-[9px] font-bold uppercase">Users</span></button>
-        <button onClick={() => setActiveTab('schedules')} className={`flex flex-col items-center gap-1 ${activeTab === 'schedules' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Broadcast /> <span className="text-[9px] font-bold uppercase">Stream</span></button>
-        <button onClick={() => setActiveTab('offers')} className={`flex flex-col items-center gap-1 ${activeTab === 'offers' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Gift /> <span className="text-[9px] font-bold uppercase">Offers</span></button>
-        <button onClick={() => setActiveTab('links')} className={`flex flex-col items-center gap-1 ${activeTab === 'links' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Link /> <span className="text-[9px] font-bold uppercase">Links</span></button>
-        <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Settings /> <span className="text-[9px] font-bold uppercase">Setup</span></button>
+        <button onClick={() => handleTabChange('users')} className={`flex flex-col items-center gap-1 ${activeTab === 'users' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Users /> <span className="text-[9px] font-bold uppercase">Users</span></button>
+        <button onClick={() => handleTabChange('schedules')} className={`flex flex-col items-center gap-1 ${activeTab === 'schedules' ? 'text-yellow-500' : 'text-gray-500'}`}><Icons.Broadcast /> <span className="text-[9px] font-bold uppercase">Stream</span></button>
+        <button onClick={() => handleTabChange('offers')} className={`flex flex-col items-center gap-1 ${activeTab === 'offers' ? 'text-yellow-500' : 'text-gray-500'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Gift /> <span className="text-[9px] font-bold uppercase">Offers</span></button>
+        <button onClick={() => handleTabChange('links')} className={`flex flex-col items-center gap-1 ${activeTab === 'links' ? 'text-yellow-500' : 'text-gray-500'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Link /> <span className="text-[9px] font-bold uppercase">Links</span></button>
+        <button onClick={() => handleTabChange('settings')} className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-yellow-500' : 'text-gray-500'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Settings /> <span className="text-[9px] font-bold uppercase">Setup</span></button>
       </nav>
 
       {/* --- MAIN CONTENT AREA --- */}
@@ -616,7 +642,9 @@ export default function AdminPage() {
               <h2 className="text-2xl md:text-4xl font-black text-white mb-2 tracking-tight uppercase">
                 {activeTab === 'users' ? 'Database Access' : activeTab === 'schedules' ? 'Broadcast Nodes' : activeTab === 'offers' ? 'Revenue Config' : activeTab === 'links' ? 'VIP Access Nodes' : 'Master Setup'}
               </h2>
-              <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.3em]">Administrator privilege active</p>
+              <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.3em]">
+                {role === 'SUPERADMIN' ? 'Superuser Master Privilege Active' : 'Restricted Admin Operator Privilege Active'}
+              </p>
           </div>
           
           <div className="flex flex-wrap gap-3 w-full lg:w-auto">
@@ -631,12 +659,13 @@ export default function AdminPage() {
                     <Icons.Upload /> <span className="uppercase text-[10px] tracking-widest hidden sm:inline">Bulk Injection</span>
                 </button>
              )}
-             {(activeTab !== 'settings' && activeTab !== 'links') && (
-             <button onClick={() => {
-                 if (activeTab === 'users') setShowUserModal(true);
-                 else if (activeTab === 'schedules') handleOpenScheduleModal();
-                 else handleOpenPackageModal();
-             }} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
+             {activeTab === 'users' && (
+             <button onClick={() => setShowUserModal(true)} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
+                <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
+            </button>
+             )}
+             {activeTab === 'schedules' && (
+             <button onClick={() => handleOpenScheduleModal()} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
                 <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
             </button>
              )}
@@ -776,7 +805,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* --- ACCESS LINKS VIEW (NEW TAB) --- */}
+        {/* --- ACCESS LINKS VIEW --- */}
         {activeTab === 'links' && (
           <div className="space-y-10 animate-in fade-in duration-500">
              <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-8 md:p-12 shadow-2xl">
@@ -872,7 +901,7 @@ export default function AdminPage() {
                    <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-4">Manual QRIS sync is currently pointing to:</p>
                    <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between">
                       <code className="text-[9px] text-gray-400 truncate max-w-[70%]">{qrisUrl || 'Unassigned'}</code>
-                      <button onClick={() => setActiveTab('offers')} className="text-[9px] font-black text-yellow-500 uppercase hover:underline">Change Asset</button>
+                      <button onClick={() => { if(checkPermission('manage_packages')) setActiveTab('offers'); }} className="text-[9px] font-black text-yellow-500 uppercase hover:underline">Change Asset</button>
                    </div>
                 </div>
              </div>
@@ -885,7 +914,7 @@ export default function AdminPage() {
       {/* MODAL USER */}
       {(showUserModal || showEditUserModal) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max- Indo w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
                 <button onClick={() => {setShowUserModal(false); setShowEditUserModal(false);}} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all hover:rotate-90"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase">{showEditUserModal ? 'Modify Node' : 'Register Entity'}</h3>
                 <form onSubmit={showEditUserModal ? handleUpdateUser : handleCreateUser} className="space-y-8">

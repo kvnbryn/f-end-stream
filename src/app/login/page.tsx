@@ -22,10 +22,15 @@ export default function LoginPage() {
   const backendUrl = getBackendUrl();
   const adminWaUrl = 'https://wa.me/6288809048431'; 
 
+  // REDIRECT JIKA SUDAH LOGIN
   useEffect(() => {
     if (!isLoading && token) {
-      if (role === 'ADMIN') router.push('/admin');
-      else router.push('/dashboard');
+      // FIX: Cek apakah role-nya ADMIN atau SUPERADMIN
+      if (role === 'ADMIN' || role === 'SUPERADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     }
   }, [isLoading, token, role, router]);
 
@@ -37,7 +42,11 @@ export default function LoginPage() {
     setShowResetButton(false);
     setIsSubmitting(true);
 
-    if (!deviceId) { setError('Device ID Error'); setIsSubmitting(false); return; }
+    if (!deviceId) { 
+      setError('Device ID Error'); 
+      setIsSubmitting(false); 
+      return; 
+    }
 
     try {
       const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
@@ -45,6 +54,7 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.toLowerCase(), deviceId }),
       });
+      
       const data = await res.json();
       
       if (!res.ok) {
@@ -55,12 +65,21 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login Failed');
       }
       
+      // Simpan Token & Role ke Context
       login(data.token, data.role);
-      if (data.role === 'ADMIN') router.push('/admin');
-      else router.push('/dashboard');
 
-    } catch (err: any) { setError(err.message); } 
-    finally { setIsSubmitting(false); }
+      // FIX: Logika redirect setelah berhasil login
+      if (data.role === 'ADMIN' || data.role === 'SUPERADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const handleSelfReset = async () => {
@@ -95,70 +114,83 @@ export default function LoginPage() {
     <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-12">
-          <h1 className="text-2xl font-bold tracking-widest text-yellow-500 mb-2">REALTIME48</h1>
-          <p className="text-gray-600 text-xs uppercase tracking-[0.3em]">Secure Access</p>
+          <h1 className="text-2xl font-bold tracking-widest text-yellow-500 mb-2 uppercase">Realtime48</h1>
+          <p className="text-gray-600 text-[10px] font-black uppercase tracking-[0.4em]">Secure Access Node</p>
         </div>
         
-        <div className="bg-black border border-gray-800 p-8 rounded-lg shadow-2xl">
+        <div className="bg-black border border-gray-800 p-8 rounded-2xl shadow-2xl">
           
           {/* SUCCESS MESSAGE */}
           {successMsg && (
-              <div className="mb-6 bg-green-900/20 border border-green-800 p-3 rounded text-center">
-                  <p className="text-green-400 text-xs font-bold">{successMsg}</p>
+              <div className="mb-6 bg-green-900/20 border border-green-800 p-4 rounded-xl text-center">
+                  <p className="text-green-400 text-xs font-bold uppercase tracking-widest">{successMsg}</p>
               </div>
           )}
 
-          {/* ERROR & RESET UI - SIMPLE & CLEAN */}
+          {/* ERROR & RESET UI */}
           {error && (
             <div className="mb-8">
                 {showResetButton ? (
-                   <div className="bg-[#111] border border-yellow-700/50 rounded-lg p-5 text-center">
-                       <h3 className="text-white font-bold text-sm mb-2">Login Ditolak</h3>
-                       <p className="text-gray-400 text-xs mb-5 leading-relaxed">
-                          Akun ini sedang aktif di perangkat lain.
+                   <div className="bg-[#111] border border-yellow-700/50 rounded-xl p-6 text-center">
+                       <h3 className="text-white font-black text-xs mb-2 uppercase tracking-widest">Access Denied</h3>
+                       <p className="text-gray-500 text-[10px] mb-6 font-bold uppercase tracking-widest leading-relaxed">
+                          Identity locked to another device node.
                        </p>
                        
                        <button 
                            onClick={handleSelfReset} 
                            disabled={isResetting}
-                           className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded text-xs uppercase tracking-wider transition-colors"
+                           className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-black py-4 rounded-xl text-[10px] uppercase tracking-[0.2em] transition-all"
                        >
-                           {isResetting ? 'Memproses...' : 'RESET & LOGIN DI SINI'}
+                           {isResetting ? 'Processing...' : 'Execute Node Reset'}
                        </button>
-                       <p className="text-[10px] text-gray-600 mt-2">Sisa reset: 3x sehari</p>
+                       <p className="text-[9px] text-gray-700 font-bold mt-4 uppercase tracking-widest">Quota: 3 Resets / Day</p>
                    </div>
                 ) : (
-                   <div className="bg-red-900/10 border border-red-900/30 p-3 rounded text-center">
-                       <p className="text-red-500 text-xs">{error}</p>
+                   <div className="bg-red-900/10 border border-red-900/30 p-4 rounded-xl text-center">
+                       <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">{error}</p>
                    </div>
                 )}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-8">
+          <form onSubmit={handleLogin} className="space-y-10">
             <div className="group relative">
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="peer w-full bg-transparent border-b border-gray-600 py-2 text-white focus:border-yellow-500 outline-none placeholder-transparent" id="loginEmail" placeholder="Email" />
-              <label htmlFor="loginEmail" className="absolute left-0 -top-3.5 text-xs text-gray-500 transition-all peer-placeholder-shown:top-2 peer-placeholder-shown:text-base peer-focus:-top-3.5 peer-focus:text-xs peer-focus:text-yellow-500">Registered Email</label>
+              <input 
+                type="email" 
+                required 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                className="peer w-full bg-transparent border-b border-gray-800 py-3 text-white focus:border-yellow-500 outline-none placeholder-transparent font-bold text-sm" 
+                id="loginEmail" 
+                placeholder="Email" 
+              />
+              <label htmlFor="loginEmail" className="absolute left-0 -top-3.5 text-[9px] font-black text-gray-600 uppercase tracking-widest transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-xs peer-focus:-top-3.5 peer-focus:text-[9px] peer-focus:text-yellow-500">Registered Identity</label>
             </div>
             
-            {/* HIDE BUTTON WHEN RESETTING IS NEEDED */}
             {!showResetButton && (
-                <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black hover:bg-yellow-500 hover:text-black font-bold py-3 rounded transition-all duration-300 disabled:opacity-50 text-sm tracking-wider">{isSubmitting ? '...' : 'PROCEED'}</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="w-full bg-white text-black hover:bg-yellow-500 font-black py-4 rounded-xl transition-all duration-300 disabled:opacity-30 text-[10px] uppercase tracking-[0.3em] shadow-xl"
+                >
+                  {isSubmitting ? 'Decrypting...' : 'Initialize Proceed'}
+                </button>
             )}
           </form>
 
            {/* WA LINK FALLBACK */}
            {showWaLink && (
-                <div className="mt-6 text-center pt-4 border-t border-gray-800">
-                    <a href={adminWaUrl} target="_blank" className="text-gray-500 hover:text-white text-xs underline">
-                        Bantuan Admin (WhatsApp)
+                <div className="mt-8 text-center pt-6 border-t border-gray-900">
+                    <a href={adminWaUrl} target="_blank" className="text-gray-600 hover:text-white text-[9px] font-black uppercase tracking-widest underline underline-offset-4 decoration-gray-800">
+                        Contact Master Admin
                     </a>
                 </div>
             )}
 
         </div>
-        <div className="mt-8 text-center">
-          <button onClick={() => router.push('/')} className="text-gray-500 text-xs hover:text-white transition-colors">← Back to Home</button>
+        <div className="mt-10 text-center">
+          <button onClick={() => router.push('/')} className="text-gray-700 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors">← Exit Protocol</button>
         </div>
       </div>
     </main>
