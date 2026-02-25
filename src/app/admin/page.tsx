@@ -148,7 +148,6 @@ export default function AdminPage() {
   const [pkgStock, setPkgStock] = useState('');
   const [pkgImage, setPkgImage] = useState('');
 
-  // [NEW FORM STATE]
   const [linkLabel, setLinkLabel] = useState('');
   const [linkDuration, setLinkDuration] = useState('1');
 
@@ -173,7 +172,6 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // [FIX LOGOUT BLACK SCREEN]
   useEffect(() => {
     if (!isLoading && !token) {
       router.push('/login');
@@ -226,7 +224,16 @@ export default function AdminPage() {
              const data = await resPkg.json();
              setPackages(data.packages);
              setQrisUrl(data.qrisUrl);
-             setChatUrl(data.chatUrl || ''); 
+             
+             // [MODIFIKASI: EKSTRAK VIDEO ID JIKA LINK YOUTUBE]
+             let displayChat = data.chatUrl || '';
+             if (displayChat.includes('youtube.com/live_chat')) {
+                try {
+                   const urlObj = new URL(displayChat);
+                   displayChat = urlObj.searchParams.get('v') || displayChat;
+                } catch (e) {}
+             }
+             setChatUrl(displayChat); 
          }
      } catch (e) { console.error(e); }
   };
@@ -309,7 +316,6 @@ export default function AdminPage() {
   };
 
   const handleEditUserClick = (user: User) => {
-      // Admin tidak boleh edit Superadmin (Cek di UI juga)
       if (user.role === 'SUPERADMIN' && role !== 'SUPERADMIN') {
         alert("⚠️ Izin Ditolak: Anda tidak boleh mengedit akun Superadmin!");
         return;
@@ -384,13 +390,24 @@ export default function AdminPage() {
   // --- SETTINGS ACTIONS ---
   const handleSaveChatUrl = async () => {
     if (!checkPermission('system_setup')) return;
+
+    // [MODIFIKASI: AUTO CONSTRUCT YOUTUBE URL JIKA INPUT HANYA ID]
+    let finalUrl = chatUrl;
+    if (chatUrl && !chatUrl.includes('://')) {
+        const domain = window.location.hostname;
+        finalUrl = `https://www.youtube.com/live_chat?v=${chatUrl.trim()}&embed_domain=${domain}`;
+    }
+
     try {
         const res = await fetch(`${backendUrl}/api/v1/admin/settings/chat`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: chatUrl })
+            body: JSON.stringify({ url: finalUrl })
         });
-        if (res.ok) showToast('Chat URL Updated!', 'success');
+        if (res.ok) {
+            showToast('Chat Synchronized!', 'success');
+            fetchGlobalData(); // Refresh UI agar input field tetap rapi
+        }
     } catch (err) { showToast('Gagal update chat', 'error'); }
   };
 
@@ -643,7 +660,6 @@ export default function AdminPage() {
           <button onClick={() => handleTabChange('users')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Users /> <span>User Database</span></button>
           <button onClick={() => handleTabChange('schedules')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'schedules' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'}`}><Icons.Broadcast /> <span>Schedules</span></button>
           
-          {/* Restricted Tabs */}
           <button onClick={() => handleTabChange('offers')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'offers' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Gift /> <span>Offer Settings</span></button>
           <button onClick={() => handleTabChange('links')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'links' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Link /> <span>Access Links</span></button>
           <button onClick={() => handleTabChange('settings')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black font-black' : 'text-gray-500 hover:bg-white/5'} ${role !== 'SUPERADMIN' ? 'opacity-30 cursor-not-allowed' : ''}`}><Icons.Settings /> <span>System Setup</span></button>
@@ -689,7 +705,6 @@ export default function AdminPage() {
             </button>
              )}
              
-             {/* [FIX: SEMBUNYIKAN NEW NODE SCHEDULE BUAT ADMIN] */}
              {activeTab === 'schedules' && role === 'SUPERADMIN' && (
              <button onClick={() => handleOpenScheduleModal()} className="flex-1 lg:flex-none bg-yellow-500 text-black px-6 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
                 <Icons.Plus /> <span className="uppercase text-[10px] tracking-widest">New Node</span>
@@ -777,8 +792,6 @@ export default function AdminPage() {
                 <div className="flex-1 flex flex-col justify-between">
                    <div className="flex justify-between items-start mb-4 gap-2">
                       <h3 className="text-lg md:text-xl font-black text-white leading-tight uppercase tracking-tight line-clamp-2">{s.title}</h3>
-                      
-                      {/* [FIX: SEMBUNYIKAN EDIT/TRASH STREAM BUAT ADMIN] */}
                       {role === 'SUPERADMIN' && (
                       <div className="flex gap-2.5 shrink-0 pt-1">
                         <button onClick={() => handleOpenScheduleModal(s)} className="text-gray-600 hover:text-yellow-500 transition-colors"><Icons.Edit /></button>
@@ -905,15 +918,15 @@ export default function AdminPage() {
              <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-10 md:p-12 space-y-12">
                 <div>
                    <h3 className="text-xl font-black text-white mb-2 tracking-tighter uppercase tracking-[0.1em]">Interaction Node Setup</h3>
-                   <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-8">Override the live chat URL globally across all active broadcast nodes.</p>
+                   <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest mb-8">Override the live chat URL globally or input YouTube Video ID.</p>
                    <div className="space-y-6">
                       <div className="space-y-3">
-                         <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Live Chat Embed Source</label>
+                         <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Live Chat ID / Embed Source</label>
                          <input 
                             type="text" 
                             value={chatUrl} 
                             onChange={(e) => setChatUrl(e.target.value)} 
-                            placeholder="https://chat.restream.io/embed?token=..." 
+                            placeholder="Contoh: TpvEpBj5SBA atau Full URL" 
                             className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500 transition-all text-xs"
                          />
                       </div>
@@ -921,7 +934,7 @@ export default function AdminPage() {
                         onClick={handleSaveChatUrl}
                         className="bg-yellow-500 text-black px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-yellow-500/10 hover:scale-[1.02] active:scale-95 transition-all"
                       >
-                         Sync System Link
+                         Sync Interaction Gateway
                       </button>
                    </div>
                 </div>
@@ -943,7 +956,7 @@ export default function AdminPage() {
 
       {/* MODAL USER */}
       {(showUserModal || showEditUserModal) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
             <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
                 <button onClick={() => {setShowUserModal(false); setShowEditUserModal(false);}} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all hover:rotate-90"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase">{showEditUserModal ? 'Modify Node' : 'Register Entity'}</h3>
@@ -979,7 +992,7 @@ export default function AdminPage() {
       {/* MODAL SCHEDULE */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[2.5rem] md:rounded-[3rem] p-8 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-in zoom-in duration-300">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl rounded-[2.5rem] md:rounded-[3rem] p-8 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
                 <button onClick={() => setShowScheduleModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all"><Icons.X /></button>
                 <h3 className="text-3xl font-black text-white mb-10 tracking-tighter uppercase">Node Configuration</h3>
                 <form onSubmit={handleSaveSchedule} className="space-y-10">
@@ -1015,7 +1028,7 @@ export default function AdminPage() {
       {/* MODAL PACKAGE */}
       {showPackageModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[3rem] p-10 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-in zoom-in duration-300">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[3rem] p-10 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
                 <button onClick={() => setShowPackageModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white transition-all"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-10 tracking-tighter uppercase">{editingPackage ? 'Reconfig Plan' : 'Initialize Plan'}</h3>
                 <form onSubmit={handleSavePackage} className="space-y-8">
@@ -1034,7 +1047,7 @@ export default function AdminPage() {
 
       {/* MEDIA LIBRARY MODAL */}
       {showMediaModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl">
             <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-5xl rounded-[3rem] p-8 md:p-12 relative h-[85vh] flex flex-col shadow-2xl">
                 <button onClick={() => setShowMediaModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-10 tracking-tighter uppercase tracking-[0.3em]">Asset Library</h3>
