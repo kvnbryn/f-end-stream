@@ -8,7 +8,7 @@ import { io, Socket } from 'socket.io-client';
 import { getBackendUrl } from '@/lib/config'; 
 import Cookies from 'js-cookie';
 
-// --- ICON COMPONENTS ---
+// --- ICON COMPONENTS (Matrix Style) ---
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const [isSpecialLink, setIsSpecialLink] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [chatUrl, setChatUrl] = useState(''); 
-  const [viewerCount, setViewerCount] = useState(0); // State Viewer Count
+  const [viewerCount, setViewerCount] = useState(0); 
   const chatContainerRef = useRef<HTMLDivElement>(null); 
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
@@ -119,11 +119,9 @@ export default function DashboardPage() {
       fetchGlobalConfig();
       
       const socket: Socket = io(backendUrl);
-      
-      // Update data stream jika ada perubahan jadwal
       socket.on('SCHEDULE_UPDATED', () => fetchStreamData());
       
-      // Listening Viewer Count Realtime
+      // Listening Realtime Viewer Count
       socket.on('VIEWER_COUNT_UPDATED', (count: number) => {
           setViewerCount(count);
       });
@@ -196,17 +194,9 @@ export default function DashboardPage() {
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
                     <h2 className="text-sm md:text-base font-black text-white uppercase truncate max-w-[180px] md:max-w-md">{streamData.title}</h2>
-                    <div className="flex items-center gap-4">
-                       <div className="flex items-center gap-1.5">
-                          <span className="relative flex h-1 w-1"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1 w-1 bg-red-500"></span></span>
-                          <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
-                       </div>
-                       
-                       {/* UI VIEWER COUNT DISPLAY */}
-                       <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
-                          <Icons.Users />
-                          <span className="text-[7px] md:text-[8px] font-black text-gray-400 tabular-nums">{viewerCount}</span>
-                       </div>
+                    <div className="flex items-center gap-2">
+                       <span className="relative flex h-1 w-1"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1 w-1 bg-red-500"></span></span>
+                       <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
                     </div>
                   </div>
 
@@ -243,7 +233,19 @@ export default function DashboardPage() {
           <div className="flex-1 lg:h-full min-h-[400px] lg:min-h-0 animate-in fade-in slide-in-from-right-2 duration-500">
             <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                <div className="h-11 shrink-0 px-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between">
-                  <div className="flex items-center gap-2"><div className="w-1 h-1 bg-red-600 rounded-full animate-pulse"></div><span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Interaction</span></div>
+                  <div className="flex items-center gap-4">
+                      {/* Label Interaction */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-1 h-1 bg-red-600 rounded-full animate-pulse"></div>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Interaction</span>
+                      </div>
+
+                      {/* VIEWER COUNT DI ATAS KOMENTAR (Kiri) */}
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                        <Icons.Users />
+                        <span className="text-[8px] font-black text-gray-400 tabular-nums">{viewerCount}</span>
+                      </div>
+                  </div>
                   <Icons.Message />
                </div>
                <div className="flex-1 relative bg-black/20 overflow-hidden">
