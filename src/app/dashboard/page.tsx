@@ -8,13 +8,14 @@ import { io, Socket } from 'socket.io-client';
 import { getBackendUrl } from '@/lib/config'; 
 import Cookies from 'js-cookie';
 
-// --- ICON COMPONENTS (Matrix Style) ---
+// --- ICON COMPONENTS ---
 const Icons = {
   Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
   Crown: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
   Film: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="7" x2="7" y1="3" y2="21"/><line x1="17" x2="17" y1="3" y2="21"/><line x1="3" x2="21" y1="12" y2="12"/></svg>,
   Message: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
 };
 
 export default function DashboardPage() {
@@ -27,15 +28,14 @@ export default function DashboardPage() {
   const [isSpecialLink, setIsSpecialLink] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [chatUrl, setChatUrl] = useState(''); 
+  const [viewerCount, setViewerCount] = useState(0); // State Viewer Count
   const chatContainerRef = useRef<HTMLDivElement>(null); 
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const backendUrl = getBackendUrl();
 
-  // Ambil special token dari cookies jika user masuk via link khusus
   const specialToken = Cookies.get('special_token');
 
   useEffect(() => {
-    // Redirect ke login kalau nggak ada token email dan nggak ada special link
     if (!isLoading && !token && !specialToken) {
       router.push('/login');
     }
@@ -63,25 +63,19 @@ export default function DashboardPage() {
       let res;
       let isLinkAccess = false;
 
-      // 1. Cek dulu apakah pakai Link Khusus (prioritas)
       if (specialToken) {
         isLinkAccess = true;
         res = await fetch(`${backendUrl}/api/v1/public/access/verify/${specialToken}`);
-      } 
-      // 2. Jika tidak, cek apakah pakai Login Email biasa
-      else if (token) {
+      } else if (token) {
         res = await fetch(`${backendUrl}/api/v1/stream/current`, { headers: { 'Authorization': `Bearer ${token}` } });
       } else {
         return;
       }
 
       const data = await res.json();
-      
-      // Ambil data stream yang bener tergantung method aksesnya
       const finalStream = isLinkAccess ? data.stream : data;
       const isValid = isLinkAccess ? data.valid : res.ok;
 
-      // Jika data tidak valid, stream kosong, atau ada pesan offline dari backend
       if (!isValid || !finalStream || finalStream.message === 'Offline') {
         throw new Error('OFFLINE');
       }
@@ -123,8 +117,17 @@ export default function DashboardPage() {
       if (token) fetchUserData(); 
       fetchStreamData();
       fetchGlobalConfig();
+      
       const socket: Socket = io(backendUrl);
+      
+      // Update data stream jika ada perubahan jadwal
       socket.on('SCHEDULE_UPDATED', () => fetchStreamData());
+      
+      // Listening Viewer Count Realtime
+      socket.on('VIEWER_COUNT_UPDATED', (count: number) => {
+          setViewerCount(count);
+      });
+
       return () => { 
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current); 
         socket.disconnect(); 
@@ -160,7 +163,6 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
             <h1 className="text-base font-black tracking-tighter text-yellow-500 uppercase">Realtime<span className="text-white">48</span></h1>
             
-            {/* Indikator Status Login (Email vs Link) */}
             {daysLeft !== null && !isSpecialLink && (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-black text-yellow-500 tracking-widest uppercase">
                    <Icons.Crown /> {daysLeft} Days Access
@@ -174,7 +176,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2 md:gap-4">
           <a href="https://realtime48show.my.id/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-gray-300 transition-all uppercase tracking-widest"><Icons.Film /> <span className="hidden sm:inline">Replay</span></a>
-          {role === 'ADMIN' && (<button onClick={() => router.push('/admin')} className="hidden md:block text-[9px] font-black text-gray-500 hover:text-yellow-500 uppercase tracking-widest transition-colors">Admin</button>)}
+          {(role === 'ADMIN' || role === 'SUPERADMIN') && (<button onClick={() => router.push('/admin')} className="hidden md:block text-[9px] font-black text-gray-500 hover:text-yellow-500 uppercase tracking-widest transition-colors">Admin</button>)}
           <button onClick={handleLogout} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white text-gray-400 transition-all border border-white/5"><Icons.Logout /></button>
         </div>
       </header>
@@ -194,9 +196,17 @@ export default function DashboardPage() {
                   <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/60"></div>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
                     <h2 className="text-sm md:text-base font-black text-white uppercase truncate max-w-[180px] md:max-w-md">{streamData.title}</h2>
-                    <div className="flex items-center gap-2">
-                       <span className="relative flex h-1 w-1"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1 w-1 bg-red-500"></span></span>
-                       <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
+                    <div className="flex items-center gap-4">
+                       <div className="flex items-center gap-1.5">
+                          <span className="relative flex h-1 w-1"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative rounded-full h-1 w-1 bg-red-500"></span></span>
+                          <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest">Live Broadcast</span>
+                       </div>
+                       
+                       {/* UI VIEWER COUNT DISPLAY */}
+                       <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                          <Icons.Users />
+                          <span className="text-[7px] md:text-[8px] font-black text-gray-400 tabular-nums">{viewerCount}</span>
+                       </div>
                     </div>
                   </div>
 
