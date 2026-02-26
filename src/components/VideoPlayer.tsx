@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import 'videojs-youtube';
+import { getBackendUrl } from '@/lib/config';
 
 if (typeof window !== 'undefined') {
   // @ts-ignore
@@ -56,7 +57,6 @@ const registerQualityMenu = () => {
     constructor(player: any, options: any) { super(player, options); this.addClass('vjs-quality-menu-button'); }
     createEl() {
       const el = super.createEl('button', { className: 'vjs-menu-button vjs-menu-button-popup vjs-control vjs-button vjs-quality-menu-button' });
-      // Centering the icon within the clickable button area
       el.innerHTML = `
         <div class="vjs-quality-icon" style="display:flex;align-items:center;justify-content:center;height:100%;pointer-events:none;">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -82,8 +82,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
   const [hasStarted, setHasStarted] = useState(false);
   const [detectedLevels, setDetectedLevels] = useState<{ label: string; val: string }[]>([]);
   const [currentQuality, setCurrentQuality] = useState('auto');
+  const backendUrl = getBackendUrl();
 
   const getSourceType = (url: string) => (url.includes('youtube.com') || url.includes('youtu.be')) ? 'video/youtube' : 'application/x-mpegURL';
+  
+  // Logic Fix: Gunakan proxy jika URL berasal dari domain bermasalah (neo.id)
+  const getProcessedUrl = (url: string) => {
+    if (url.includes('neo.id') || url.includes('.m3u8')) {
+      return `${backendUrl}/api/v1/proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
+
   const isYoutube = currentSource ? getSourceType(currentSource.url) === 'video/youtube' : false;
 
   const handleFullscreenLogic = async () => {
@@ -111,7 +121,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
     const player = playerRef.current = videojs(videoElement, {
       autoplay: true, controls: true, responsive: true, fluid: false,
       techOrder: ['html5', 'youtube'],
-      sources: [{ src: currentSource.url, type: getSourceType(currentSource.url) }],
+      sources: [{ 
+        src: isYoutube ? currentSource.url : getProcessedUrl(currentSource.url), 
+        type: getSourceType(currentSource.url) 
+      }],
       plugins: { qualityLevels: {} },
       youtube: { ytControls: 0, modestbranding: 1, iv_load_policy: 3, rel: 0, playsinline: 1, enablejsapi: 1 },
       controlBar: {
@@ -214,7 +227,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
         .video-js.vjs-idn-fix .vjs-tech { object-fit: contain !important; }
         .video-js.vjs-youtube-mode .vjs-tech { object-fit: contain !important; transform: none !important; pointer-events: none !important; }
         
-        /* FIXING THE DAMN CONTROL BAR */
         .vjs-control-bar {
           background: rgba(0, 0, 0, 0.8) !important;
           height: 40px !important;
@@ -224,7 +236,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
           padding: 0 5px !important;
         }
 
-        /* Elements must be forced into a single flex row */
         .vjs-control-bar > div, .vjs-control-bar > button {
            position: relative !important;
            top: auto !important;
@@ -235,7 +246,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
         }
 
         .vjs-progress-control { flex: 1 !important; height: 100% !important; }
-        .vjs-custom-control-spacer { display: none !important; } /* Remove spacer to prevent weird gaps */
+        .vjs-custom-control-spacer { display: none !important; }
 
         .vjs-current-time, .vjs-time-divider, .vjs-duration-display {
           font-size: 11px !important;
@@ -244,7 +255,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
           min-width: 0 !important;
         }
 
-        /* Quality Gear Button - Precise Click Area */
         .vjs-quality-menu-button {
           width: 40px !important;
           cursor: pointer !important;
