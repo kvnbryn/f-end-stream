@@ -86,9 +86,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
 
   const getSourceType = (url: string) => (url.includes('youtube.com') || url.includes('youtu.be')) ? 'video/youtube' : 'application/x-mpegURL';
   
-  // Logic Fix: Gunakan proxy backend untuk membypass CORS dan rewrite link segment agar tidak 404
+  // Logic Fix: Gunakan proxy HTTPS untuk link m3u8 bermasalah
   const getProcessedUrl = (url: string) => {
     if (url.includes('neo.id') || url.includes('.m3u8')) {
+      // Encode URL agar karakter spesial seperti / dan : tidak merusak query param
       return `${backendUrl}/api/v1/proxy?url=${encodeURIComponent(url)}`;
     }
     return url;
@@ -174,7 +175,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
       }
       if (videoRef.current) videoRef.current.innerHTML = '';
     };
-  }, [currentSource]);
+  }, [currentSource, backendUrl]); // Tambah backendUrl di dependency
 
   useEffect(() => {
     if (!playerRef.current) return;
