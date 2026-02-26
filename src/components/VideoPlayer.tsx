@@ -86,7 +86,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources, activeSourceIndex, o
 
   const getSourceType = (url: string) => (url.includes('youtube.com') || url.includes('youtu.be')) ? 'video/youtube' : 'application/x-mpegURL';
   
-  // Logic Fix: Gunakan proxy jika URL berasal dari domain bermasalah (neo.id)
+  // Logic Fix: Gunakan proxy backend untuk membypass CORS dan rewrite link segment agar tidak 404
   const getProcessedUrl = (url: string) => {
     if (url.includes('neo.id') || url.includes('.m3u8')) {
       return `${backendUrl}/api/v1/proxy?url=${encodeURIComponent(url)}`;
