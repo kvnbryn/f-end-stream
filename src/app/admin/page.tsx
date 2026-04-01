@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { getBackendUrl } from '@/lib/config'; 
@@ -194,7 +194,7 @@ export default function AdminPage() {
             page: page.toString(),
             limit: '20',
             search: debouncedSearch,
-            status: userFilter
+            status: userFilter === 'EXPIRED' ? 'ACTIVE' : userFilter // Fetch ACTIVE if EXPIRED to filter on frontend
         });
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
              headers: { 'Authorization': `Bearer ${token}` }
@@ -225,7 +225,6 @@ export default function AdminPage() {
              setPackages(data.packages);
              setQrisUrl(data.qrisUrl);
              
-             // [MODIFIKASI: EKSTRAK VIDEO ID JIKA LINK YOUTUBE]
              let displayChat = data.chatUrl || '';
              if (displayChat.includes('youtube.com/live_chat')) {
                 try {
@@ -259,6 +258,18 @@ export default function AdminPage() {
       return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
   };
 
+  // [MODIFIKASI: CLIENT-SIDE FILTERING]
+  // Memastikan data yang tampil di tabel benar-benar sesuai tab yang dipilih
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+        if (userFilter === 'ALL') return true;
+        if (userFilter === 'PENDING') return u.status === 'PENDING';
+        if (userFilter === 'EXPIRED') return isUserExpired(u);
+        if (userFilter === 'ACTIVE') return u.status === 'ACTIVE' && !isUserExpired(u);
+        return true;
+    });
+  }, [users, userFilter]);
+
   const handleSelectUser = (id: string) => {
       const newSet = new Set(selectedUserIds);
       if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
@@ -266,8 +277,8 @@ export default function AdminPage() {
   };
 
   const handleSelectAll = () => {
-      if (selectedUserIds.size === users.length) setSelectedUserIds(new Set());
-      else setSelectedUserIds(new Set(users.map(u => u.id)));
+      if (selectedUserIds.size === filteredUsers.length) setSelectedUserIds(new Set());
+      else setSelectedUserIds(new Set(filteredUsers.map(u => u.id)));
   };
 
   const handleBulkDelete = async () => {
@@ -391,7 +402,6 @@ export default function AdminPage() {
   const handleSaveChatUrl = async () => {
     if (!checkPermission('system_setup')) return;
 
-    // [MODIFIKASI: AUTO CONSTRUCT YOUTUBE URL JIKA INPUT HANYA ID]
     let finalUrl = chatUrl;
     if (chatUrl && !chatUrl.includes('://')) {
         const domain = window.location.hostname;
@@ -406,7 +416,7 @@ export default function AdminPage() {
         });
         if (res.ok) {
             showToast('Chat Synchronized!', 'success');
-            fetchGlobalData(); // Refresh UI agar input field tetap rapi
+            fetchGlobalData(); 
         }
     } catch (err) { showToast('Gagal update chat', 'error'); }
   };
@@ -592,7 +602,6 @@ export default function AdminPage() {
     setShowMediaModal(false);
   };
 
-  // [NEW ACTIONS: SPECIAL ACCESS LINKS]
   const handleGenerateLink = async () => {
     if (!checkPermission('manage_links')) return;
     try {
@@ -734,7 +743,7 @@ export default function AdminPage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-white/5 text-gray-500 uppercase tracking-[0.2em] text-[9px] font-black">
                     <tr>
-                        <th className="p-6 w-4"><input type="checkbox" onChange={handleSelectAll} checked={users.length > 0 && selectedUserIds.size === users.length} className="accent-yellow-500" /></th>
+                        <th className="p-6 w-4"><input type="checkbox" onChange={handleSelectAll} checked={filteredUsers.length > 0 && selectedUserIds.size === filteredUsers.length} className="accent-yellow-500" /></th>
                         <th className="p-6">User Node</th>
                         <th className="p-6">Access State</th>
                         <th className="p-6 text-center">Security</th>
@@ -742,7 +751,7 @@ export default function AdminPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                    {users.length > 0 ? users.map((u) => (
+                    {filteredUsers.length > 0 ? filteredUsers.map((u) => (
                         <tr key={u.id} className={`hover:bg-white/[0.02] transition-colors ${selectedUserIds.has(u.id) ? 'bg-yellow-500/5' : ''}`}>
                             <td className="p-6"><input type="checkbox" checked={selectedUserIds.has(u.id)} onChange={() => handleSelectUser(u.id)} className="accent-yellow-500" /></td>
                             <td className="p-6"><div className="font-bold text-white mb-0.5">{u.email}</div><div className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">{u.status}</div></td>
@@ -957,7 +966,7 @@ export default function AdminPage() {
       {/* MODAL USER */}
       {(showUserModal || showEditUserModal) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-md rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl">
                 <button onClick={() => {setShowUserModal(false); setShowEditUserModal(false);}} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all hover:rotate-90"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase">{showEditUserModal ? 'Modify Node' : 'Register Entity'}</h3>
                 <form onSubmit={showEditUserModal ? handleUpdateUser : handleCreateUser} className="space-y-8">
@@ -972,7 +981,7 @@ export default function AdminPage() {
       {/* APPROVE MODAL */}
       {showApproveModal && editingUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 md:p-12 relative shadow-2xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-md rounded-[2.5rem] p-8 md:p-12 relative shadow-2xl">
                 <button onClick={() => setShowApproveModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-all hover:rotate-90"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-3 tracking-tighter uppercase">Authorize node</h3>
                 <p className="text-[10px] text-gray-600 mb-8 font-mono tracking-tighter">{editingUser.email}</p>
@@ -1028,7 +1037,7 @@ export default function AdminPage() {
       {/* MODAL PACKAGE */}
       {showPackageModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[3rem] p-10 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
+            <div className="bg-[#0a0a0a] border border-white/10 w-full max-md rounded-[3rem] p-10 md:p-12 relative max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
                 <button onClick={() => setShowPackageModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white transition-all"><Icons.X /></button>
                 <h3 className="text-2xl font-black text-white mb-10 tracking-tighter uppercase">{editingPackage ? 'Reconfig Plan' : 'Initialize Plan'}</h3>
                 <form onSubmit={handleSavePackage} className="space-y-8">
@@ -1092,7 +1101,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* --- STYLES --- */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
