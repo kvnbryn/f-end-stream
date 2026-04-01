@@ -151,6 +151,13 @@ export default function AdminPage() {
   const [linkLabel, setLinkLabel] = useState('');
   const [linkDuration, setLinkDuration] = useState('1');
 
+  // [NEW: INDIKATOR HITUNG BULK]
+  const bulkCount = useMemo(() => {
+    if (!bulkText.trim()) return 0;
+    // Split berdasarkan baris baru atau koma, lalu bersihkan string kosong
+    return bulkText.split(/[\n,]+/).filter(item => item.trim() !== '').length;
+  }, [bulkText]);
+
   // [HELPER PERMISSION]
   const checkPermission = (action: string) => {
     const restricted = ['offers', 'links', 'settings', 'manage_packages', 'manage_links', 'system_setup', 'modify_schedule'];
@@ -194,7 +201,7 @@ export default function AdminPage() {
             page: page.toString(),
             limit: '20',
             search: debouncedSearch,
-            status: userFilter === 'EXPIRED' ? 'ACTIVE' : userFilter // Fetch ACTIVE if EXPIRED to filter on frontend
+            status: userFilter === 'EXPIRED' ? 'ACTIVE' : userFilter 
         });
         const res = await fetch(`${backendUrl}/api/v1/admin/users?${params.toString()}`, {
              headers: { 'Authorization': `Bearer ${token}` }
@@ -258,8 +265,7 @@ export default function AdminPage() {
       return new Date().getTime() > new Date(user.Subscription.end_time).getTime();
   };
 
-  // [MODIFIKASI: CLIENT-SIDE FILTERING]
-  // Memastikan data yang tampil di tabel benar-benar sesuai tab yang dipilih
+  // [PERSIST: CLIENT-SIDE FILTERING DARI REVISI SEBELUMNYA]
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
         if (userFilter === 'ALL') return true;
@@ -588,7 +594,7 @@ export default function AdminPage() {
           showToast('Media Uploaded!', 'success');
         }
     } catch (e) { showToast('Gagal upload', 'error'); }
-    finally { setUploading(false); }
+    finally { setIsLoadingUsers(false); }
   };
 
   const handleSelectMedia = (url: string) => {
@@ -1090,17 +1096,34 @@ export default function AdminPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
             <div className="bg-[#0a0a0a] border border-white/10 w-full max-lg rounded-[3rem] p-10 md:p-12 relative shadow-2xl animate-in zoom-in duration-300">
                 <button onClick={() => setShowBulkModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white"><Icons.X /></button>
-                <h3 className="text-2xl font-black text-white mb-3 tracking-tighter uppercase">Mass Injection</h3>
-                <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-10">Matrix delimiters: \n or comma (,)</p>
+                <div className="flex justify-between items-start mb-3">
+                   <div>
+                      <h3 className="text-2xl font-black text-white tracking-tighter uppercase">Mass Injection</h3>
+                      <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Matrix delimiters: \n or comma (,)</p>
+                   </div>
+                   {/* [NEW INDICATOR UI] */}
+                   <div className="bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-xl text-right">
+                      <div className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Total Detected</div>
+                      <div className="text-lg font-black text-yellow-500 leading-none">{bulkCount}</div>
+                   </div>
+                </div>
+
                 <form onSubmit={handleBulkImport} className="space-y-8">
                     <div><label className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-3 block">Duration Offset</label><input type="number" value={bulkDuration} onChange={(e) => setBulkDuration(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white font-bold outline-none focus:border-yellow-500" required /></div>
-                    <textarea className="w-full h-64 bg-white/5 border border-white/10 rounded-[2.5rem] p-8 text-white text-[11px] font-mono outline-none focus:border-yellow-500 transition-all custom-scrollbar" placeholder="email@node.com, email2@node.com" value={bulkText} onChange={(e) => setBulkText(e.target.value)} required />
-                    <button type="submit" disabled={bulkLoading} className="w-full bg-white text-black font-black py-6 rounded-3xl hover:bg-yellow-500 transition-all uppercase text-[10px] tracking-[0.3em] disabled:opacity-30 shadow-xl">{bulkLoading ? 'Processing...' : 'Execute Injection'}</button>
+                    <textarea 
+                        className="w-full h-64 bg-white/5 border border-white/10 rounded-[2.5rem] p-8 text-white text-[11px] font-mono outline-none focus:border-yellow-500 transition-all custom-scrollbar" 
+                        placeholder="email@node.com&#10;email2@node.com, email3@node.com" 
+                        value={bulkText} 
+                        onChange={(e) => setBulkText(e.target.value)} 
+                        required 
+                    />
+                    <button type="submit" disabled={bulkLoading || bulkCount === 0} className="w-full bg-white text-black font-black py-6 rounded-3xl hover:bg-yellow-500 transition-all uppercase text-[10px] tracking-[0.3em] disabled:opacity-30 shadow-xl">{bulkLoading ? 'Processing...' : 'Execute Injection'}</button>
                 </form>
             </div>
         </div>
       )}
 
+      {/* --- STYLES --- */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
